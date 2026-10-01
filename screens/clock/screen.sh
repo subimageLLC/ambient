@@ -108,6 +108,18 @@ weather() {
 
 tick=0
 W_OUT=(); W_PLAIN=(); ALERT_OUT=""; ALERT_PLAIN=""
+
+trap ' : ' WINCH
+
+stable=0
+last_sz=""
+while [ $stable -lt 2 ]; do
+    cur_sz="$(tput cols)x$(tput lines)"
+    if [ "$cur_sz" = "$last_sz" ]; then stable=$((stable + 1)); else stable=0; fi
+    last_sz=$cur_sz
+    sleep 0.15
+done
+
 while :; do
     C=$(tput cols) L=$(tput lines)
     T=$(date +%I:%M) D=$(date '+%A, %B %-d')
@@ -157,5 +169,6 @@ while :; do
     for ((i = 0; i < padb; i++)); do printf '\033[K'; (( i < padb - 1 )) && printf '\n'; done
 
     tick=$((tick + 1))
-    sleep 1
+    sleep 1 &
+    wait $!
 done

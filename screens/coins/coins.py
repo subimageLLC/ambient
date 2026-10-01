@@ -364,9 +364,23 @@ def chart_data(coin_id, days):
     return fetch(chart_url(coin_id, days), CHART_CACHE + f".{coin_id}.{days}", 300, min_gap=MIN_CHART_GAP)
 
 
+def wait_stable_size(stdscr):
+    stable = 0
+    last = None
+    while stable < 2:
+        cur = stdscr.getmaxyx()
+        if cur == last:
+            stable += 1
+        else:
+            stable = 0
+        last = cur
+        time.sleep(0.15)
+
+
 def draw(stdscr):
     curses.curs_set(0)
     stdscr.timeout(500)
+    wait_stable_size(stdscr)
     curses.start_color()
     curses.use_default_colors()
     curses.init_pair(1, curses.COLOR_CYAN, -1)
