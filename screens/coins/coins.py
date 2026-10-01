@@ -200,6 +200,7 @@ MARKETS_CACHE = os.path.join(CACHE_DIR, "screen-coins.json")
 CHART_CACHE = os.path.join(CACHE_DIR, "screen-coins-chart.json")
 LOG = os.path.join(CACHE_DIR, "screen-coins.log")
 EIGHTHS = " ▁▂▃▄▅▆▇█"
+SPINNER = "▁▃▅▇█▇▅▃"
 BRAILLE_BITS = [[1, 2, 4, 8], [16, 32, 64, 128]]
 RETRY_AT = {}
 LAST_NET = [0.0]
@@ -387,6 +388,7 @@ def draw(stdscr):
     tfs = [("D", 1), ("W", 7), ("M", 30), ("Y", 365)]
     tfi = 0
     fetched = 0
+    anim = 0
 
     if not os.path.exists(CONFIG):
         chosen = portfolio_editor(stdscr, {"bitcoin", "ethereum", "solana"})
@@ -398,6 +400,7 @@ def draw(stdscr):
         IDS = load_coins()
         if sel >= len(IDS):
             sel = 0
+        anim += 1
         api_markets = (
             "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids="
             + ",".join(i for i, _ in IDS)
@@ -455,6 +458,10 @@ def draw(stdscr):
             else:
                 msg = "loading chart…"
             stdscr.addstr(y + ph // 2, 3, msg, curses.color_pair(4))
+            try:
+                stdscr.addstr(y + ph // 2, 3 + len(msg) + 1, SPINNER[anim % len(SPINNER)], curses.color_pair(1) | curses.A_BOLD)
+            except curses.error:
+                pass
         else:
             marks = [0.0, 0.25, 0.5, 0.75, 1.0] if ph >= 20 else [0.0, 0.5, 1.0]
             for f in marks:
@@ -506,11 +513,15 @@ def draw(stdscr):
         age = int(time.time() - os.path.getmtime(MARKETS_CACHE)) if os.path.exists(MARKETS_CACHE) else 9999
         stale = " STALE" if age > 300 else ""
         t = time.strftime("%H:%M", time.localtime(os.path.getmtime(MARKETS_CACHE))) if os.path.exists(MARKETS_CACHE) else "--:--"
-        foot = f" ↑↓ select · a pick coins · x remove · tab timeframe · r refresh · q quit "
-        stdscr.addstr(h - 1, 1, foot[: w - 2], curses.color_pair(5))
         info = f"coingecko {t}{stale}"
+        foot = " ↑↓ coin · a pick · x remove · tab tf · r refresh · q quit "
         try:
-            stdscr.addstr(h - 1, max(1, w - len(info) - 1), info, curses.color_pair(4))
+            stdscr.addstr(h - 1, 1, info, curses.color_pair(4))
+        except curses.error:
+            pass
+        try:
+            fx = max(len(info) + 3, w - len(foot) - 1)
+            stdscr.addstr(h - 1, fx, foot[: max(1, w - fx)], curses.color_pair(5))
         except curses.error:
             pass
         stdscr.refresh()

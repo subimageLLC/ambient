@@ -25,6 +25,7 @@ type Manifest struct {
 	Glyphs        string
 	Reads         []string
 	Contacts      []string
+	Keys          []string
 }
 
 type Screen struct {

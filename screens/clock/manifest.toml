@@ -6,6 +6,7 @@ needs    = ["toilet", "jq", "network"]
 glyphs   = "plain"
 reads    = ["~/.config/ambient/screens/clock.conf", "~/.cache/ambient/weather.json", "~/.cache/ambient/weather-alerts.json"]
 contacts = ["wttr.in", "api.weather.gov"]
+keys     = ["no in-screen keys — press C-b * to set location"]
 
 # faithful port of the kiosk's screen-clock: toilet mono12 time (gray 244),
 # white date, wttr.in rows in °F with ▲/▼ hi-lo, NWS alert line.

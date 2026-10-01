@@ -7,5 +7,6 @@ needs    = ["gping", "network"]
 glyphs   = "plain"
 reads    = ["~/.config/ambient/screens/net.conf"]
 contacts = []
+keys     = ["no in-screen keys — press C-b * to change the wan target"]
 
 # faithful port of the kiosk's net window: gping gateway + wan

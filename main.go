@@ -88,6 +88,8 @@ func main() {
 			}
 			fmt.Printf("%-12s %-12s refresh=%ds%s\n", s.Name, s.Mode, s.Refresh, setup)
 		}
+	case "help":
+		cmdHelp()
 	case "setup":
 		cmdSetup(os.Args[2:])
 	case "version":
@@ -132,6 +134,55 @@ func loadScreens(c cfg.Config) []screen.Screen {
 	return screens
 }
 
+func currentWindow() string {
+	cmd := exec.Command("tmux", "display-message", "-p", "#W")
+	out, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
+
+func cmdHelp() {
+	screens := loadScreens(cfg.Default())
+	name := currentWindow()
+	fmt.Println()
+	fmt.Printf("  ambient keys — %s\n", func() string {
+		if name == "" {
+			return "all screens"
+		}
+		return name
+	}())
+	if name != "" {
+		for _, s := range screens {
+			if s.Name == name {
+				fmt.Printf("  ── %s ─────────────────────\n", s.Name)
+				for _, k := range s.Keys {
+					fmt.Printf("    %s\n", k)
+				}
+				break
+			}
+		}
+	} else {
+		for _, s := range screens {
+			if len(s.Keys) == 0 {
+				continue
+			}
+			fmt.Printf("  ── %s ─────────────────────\n", s.Name)
+			for _, k := range s.Keys {
+				fmt.Printf("    %s\n", k)
+			}
+		}
+	}
+	fmt.Println("  ── global ───────────────────")
+	fmt.Println("    C-b n / N    next / previous screen")
+	fmt.Println("    C-b p        pause / resume rotation")
+	fmt.Println("    C-b ?        this help")
+	fmt.Println("    C-b *        settings for this screen")
+	fmt.Println("    C-b d        detach")
+	fmt.Println()
+}
+
 func cmdSetup(args []string) {
 	c, _ := cfg.Load()
 	screens := loadScreens(c)
@@ -159,7 +210,11 @@ func cmdSetup(args []string) {
 	}
 	for _, target := range targets {
 		if target.Setup == "" {
-			die(fmt.Errorf("screen %q has no setup", target.Name))
+			fmt.Printf("\n%s has no terminal setup — its settings live on-screen:\n", target.Name)
+			for _, k := range target.Keys {
+				fmt.Printf("  %s\n", k)
+			}
+			continue
 		}
 		if err := runSetup(target); err != nil {
 			die(err)

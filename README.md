@@ -42,8 +42,13 @@ Screens rotate every 60s by default. Core options live in `~/.config/ambient/amb
 
 Run `ambient screens` to see which screens have a setup command.
 
-Keys (inside the session): `Ctrl-b n/N` next/previous screen, `Ctrl-b p`
-pause/unpause rotation, `Ctrl-b d` detach.
+Keys — the same on every screen, shown in the status bar:
+
+- `Ctrl-b ?` — key help for the current screen (per-screen keys come from its manifest)
+- `Ctrl-b *` — settings for the current screen (runs its setup in a popup; screens without one list their on-screen keys instead)
+- `Ctrl-b n` / `N` — next / previous screen
+- `Ctrl-b p` — pause/unpause rotation
+- `Ctrl-b d` — detach
 
 ## Requirements
 
