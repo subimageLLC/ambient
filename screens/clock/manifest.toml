@@ -1,9 +1,10 @@
 name     = "clock"
-mode     = "passive"
-entry    = "screen.sh"
+mode     = "interactive"
+entry    = "clock.py"
 setup    = "setup.sh"
-refresh  = 60
 needs    = ["python3", "network"]
-glyphs   = "plain"
+glyphs   = "blocks"
 reads    = ["~/.config/ambient/screens/clock.conf", "~/.cache/ambient/fetch/weather.json"]
 contacts = ["wttr.in"]
+
+# keys: s set location (zipcode/city/lat,lon) · q quits the pane

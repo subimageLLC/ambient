@@ -1,9 +1,11 @@
 name     = "net"
-mode     = "passive"
-entry    = "screen.sh"
+mode     = "interactive"
+entry    = "net.py"
 setup    = "setup.sh"
-refresh  = 30
-needs    = ["network"]
-glyphs   = "blocks"
-reads    = ["~/.config/ambient/screens/net.conf", "~/.cache/ambient/net.*.hist"]
+setup_optional = true
+needs    = ["network", "python3"]
+glyphs   = "braille"
+reads    = ["~/.config/ambient/screens/net.conf"]
 contacts = []
+
+# keys: s set wan target · q quits the pane

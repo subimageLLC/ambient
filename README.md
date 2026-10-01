@@ -33,9 +33,12 @@ Screens rotate every 60s by default. Core options live in `~/.config/ambient/amb
   coins grouped by network (majors, ethereum, base, solana, hyperliquid,
   privacy), type to filter, space to pick. `a` reopens it anytime, `x` removes
   the selected coin.
-- `clock` — `ambient setup clock` asks for a zipcode, city, or lat,lon for
-  weather (that query goes to wttr.in; nothing else about you does).
-- `net` — works out of the box; `ambient setup net` to change the WAN host.
+- `clock` — big block-digit clock and weather. Press `s` right on the screen
+  to set a zipcode, city, or lat,lon (that query goes to wttr.in; nothing
+  else about you does). `ambient setup clock` works from the terminal too.
+- `net` — live gping-style latency charts for your gateway and the internet.
+  Press `s` to change the WAN target. Works out of the box.
+- `ambient setup` with no arguments runs every screen's setup wizard.
 
 Run `ambient screens` to see which screens have a setup command.
 

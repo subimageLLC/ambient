@@ -133,32 +133,58 @@ func loadScreens(c cfg.Config) []screen.Screen {
 }
 
 func cmdSetup(args []string) {
-	if len(args) < 1 {
-		fmt.Fprintln(os.Stderr, "usage: ambient setup <screen>")
-		fmt.Fprintln(os.Stderr, "configurable screens:")
-		c, _ := cfg.Load()
-		for _, s := range loadScreens(c) {
-			if s.Setup != "" {
-				fmt.Fprintf(os.Stderr, "  %s\n", s.Name)
-			}
-		}
-		os.Exit(2)
-	}
 	c, _ := cfg.Load()
 	screens := loadScreens(c)
-	var target *screen.Screen
-	for i := range screens {
-		if screens[i].Name == args[0] {
-			target = &screens[i]
-			break
+	var targets []screen.Screen
+	if len(args) > 0 {
+		for _, s := range screens {
+			if s.Name == args[0] {
+				targets = append(targets, s)
+				break
+			}
+		}
+		if len(targets) == 0 {
+			die(fmt.Errorf("unknown screen %q", args[0]))
+		}
+	} else {
+		for _, s := range screens {
+			if s.Setup != "" {
+				targets = append(targets, s)
+			}
+		}
+		if len(targets) == 0 {
+			fmt.Fprintln(os.Stderr, "no screens have a setup command")
+			os.Exit(2)
 		}
 	}
-	if target == nil {
-		die(fmt.Errorf("unknown screen %q", args[0]))
+	for _, target := range targets {
+		if target.Setup == "" {
+			die(fmt.Errorf("screen %q has no setup", target.Name))
+		}
+		if err := runSetup(target); err != nil {
+			die(err)
+		}
 	}
-	if target.Setup == "" {
-		die(fmt.Errorf("screen %q has no setup", args[0]))
+}
+
+func unconfigured(screens []screen.Screen) []string {
+	var out []string
+	for _, s := range screens {
+		if s.Setup == "" || s.SetupOptional || len(s.Reads) == 0 {
+			continue
+		}
+		p := strings.ReplaceAll(s.Reads[0], "~", os.Getenv("HOME"))
+		if strings.Contains(p, "*") {
+			continue
+		}
+		if _, err := os.Stat(p); err != nil {
+			out = append(out, s.Name)
+		}
 	}
+	return out
+}
+
+func runSetup(target screen.Screen) error {
 	exe, _ := os.Executable()
 	cmd := exec.Command(filepath.Join(target.Dir, target.Setup))
 	cmd.Env = append(os.Environ(),
@@ -169,9 +195,7 @@ func cmdSetup(args []string) {
 		"AMBIENT_VERSION="+version,
 	)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
-	if err := cmd.Run(); err != nil {
-		die(err)
-	}
+	return cmd.Run()
 }
 
 func cmdStart(rebuild bool) {
@@ -200,6 +224,10 @@ func cmdStart(rebuild bool) {
 			die(err)
 		}
 		fmt.Printf("ambient: session built with %d screens\n", len(screens))
+		if un := unconfigured(screens); len(un) > 0 {
+			fmt.Printf("ambient: not configured yet: %s — run `ambient setup %s` (or press s on the screen)\n",
+				strings.Join(un, ", "), un[0])
+		}
 	}
 	if !*noRotate {
 		if err := session.SpawnTicker(exe, c.RotationSecs); err != nil {

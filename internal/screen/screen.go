@@ -15,15 +15,16 @@ import (
 )
 
 type Manifest struct {
-	Name     string
-	Mode     string
-	Entry    string
-	Setup    string
-	Refresh  int
-	Needs    []string
-	Glyphs   string
-	Reads    []string
-	Contacts []string
+	Name          string
+	Mode          string
+	Entry         string
+	Setup         string
+	SetupOptional bool `toml:"setup_optional"`
+	Refresh       int
+	Needs         []string
+	Glyphs        string
+	Reads         []string
+	Contacts      []string
 }
 
 type Screen struct {

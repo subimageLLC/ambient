@@ -146,9 +146,12 @@ def portfolio_editor(stdscr, chosen):
             base = disp - body + 1
         stdscr.erase()
         stdscr.addstr(0, 1, " pick your coins ", curses.color_pair(1) | curses.A_BOLD | curses.A_REVERSE)
-        if flt:
-            stdscr.addstr(0, 20, f" filter: {flt}", curses.color_pair(4))
-        y = 1
+        try:
+            input_row = f" filter: {flt}▏"
+            stdscr.addstr(1, 1, input_row.ljust(w - 2)[: w - 2], curses.color_pair(5) | curses.A_REVERSE)
+        except curses.error:
+            pass
+        y = 3
         for i in range(base, min(len(rows), base + body)):
             r = rows[i]
             if r[0] == "header":
@@ -165,10 +168,10 @@ def portfolio_editor(stdscr, chosen):
                 except curses.error:
                     pass
             y += 1
-        foot = " type to filter · space pick · enter save · esc cancel "
-        stdscr.addstr(h - 1, 1, foot[: w - 10], curses.color_pair(4))
+        foot = " space pick · enter = done (save & close) · esc cancel "
+        stdscr.addstr(h - 1, 1, foot[: w - 12], curses.color_pair(5))
         try:
-            stdscr.addstr(h - 1, w - 9, f"{len(chosen)} picked", curses.color_pair(4))
+            stdscr.addstr(h - 1, w - 11, f"{len(chosen)} picked", curses.color_pair(4))
         except curses.error:
             pass
         stdscr.refresh()
@@ -349,12 +352,15 @@ def line_grid(vals, height, width):
     return rows, lo, hi, last_row
 
 
-def chart_data(coin_id, days):
-    url = (
+def chart_url(coin_id, days):
+    return (
         f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
         f"?vs_currency=usd&days={days}"
     )
-    return fetch(url, CHART_CACHE + f".{coin_id}.{days}", 300, min_gap=MIN_CHART_GAP)
+
+
+def chart_data(coin_id, days):
+    return fetch(chart_url(coin_id, days), CHART_CACHE + f".{coin_id}.{days}", 300, min_gap=MIN_CHART_GAP)
 
 
 def draw(stdscr):
@@ -436,7 +442,13 @@ def draw(stdscr):
                 else:
                     stdscr.addch(y + r, 1 + x, ch, curses.color_pair(1))
         if hi is None:
-            stdscr.addstr(y + ph // 2, 3, "no chart data — retrying (rate-limited?)", curses.color_pair(4))
+            url = chart_url(coin_id, tfs[tfi][1])
+            retry_at = RETRY_AT.get(url, 0)
+            if retry_at > time.time():
+                msg = f"rate-limited — chart retrying in {int(retry_at - time.time())}s"
+            else:
+                msg = "loading chart…"
+            stdscr.addstr(y + ph // 2, 3, msg, curses.color_pair(4))
         else:
             stdscr.addstr(y, 2 + cw + 1, f"${fmt(hi)}", curses.color_pair(4))
             stdscr.addstr(y + ph // 2, 2 + cw + 1, f"${fmt((hi + lo) / 2)}", curses.color_pair(4))
@@ -465,7 +477,7 @@ def draw(stdscr):
         stale = " STALE" if age > 300 else ""
         t = time.strftime("%H:%M", time.localtime(os.path.getmtime(MARKETS_CACHE))) if os.path.exists(MARKETS_CACHE) else "--:--"
         foot = f" ↑↓ select · a pick coins · x remove · tab timeframe · r refresh · q quit "
-        stdscr.addstr(h - 1, 1, foot[: w - 2], curses.color_pair(4))
+        stdscr.addstr(h - 1, 1, foot[: w - 2], curses.color_pair(5))
         info = f"coingecko {t}{stale}"
         try:
             stdscr.addstr(h - 1, max(1, w - len(info) - 1), info, curses.color_pair(4))
