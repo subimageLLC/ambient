@@ -20,7 +20,7 @@ GRN="\033[1;32m"
 RED="\033[1;31m"
 YEL="\033[1;33m"
 CYN="\033[36m"
-WHT="\033[1;37m"
+WHT="\033[1;39m"
 OFF="\033[0m"
 WFILE="${AMBIENT_CACHE_DIR:-$HOME/.cache/ambient}/weather.json"
 AFILE="${AMBIENT_CACHE_DIR:-$HOME/.cache/ambient}/weather-alerts.json"
@@ -75,7 +75,7 @@ weather() {
 
     W_OUT=()
     W_PLAIN=()
-    W_OUT+=("$DIM$(printf '%-10s' Now)$OFF\033[37m${nowF}°$OFF  $DIM${desc}$OFF")
+    W_OUT+=("$DIM$(printf '%-10s' Now)$OFF\033[39m${nowF}°$OFF  $DIM${desc}$OFF")
     W_PLAIN+=("$(printf '%-10s' Now)${nowF}°  $desc")
     W_OUT+=("$DIM$(printf '%-10s' Today)$OFF\033[33m▲ ${hi}°$OFF  \033[36m▼ ${lo}°$OFF")
     W_PLAIN+=("$(printf '%-10s' Today)▲ ${hi}°  ▼ ${lo}°")

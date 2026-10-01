@@ -390,7 +390,7 @@ def draw(stdscr):
         curses.init_pair(4, 244, -1)
     except curses.error:
         curses.init_pair(4, 8, -1)
-    curses.init_pair(5, curses.COLOR_WHITE, -1)
+    curses.init_pair(5, -1, -1)
     try:
         curses.init_pair(6, 237, -1)
         curses.init_pair(7, 240, -1)
