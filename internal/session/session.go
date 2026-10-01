@@ -175,12 +175,10 @@ func Build(o Options) error {
 	if err := run([]string{"bind-key", "*", "display-popup", "-w", "80", "-h", "16", "-E", setupCmd}, false); err != nil {
 		return err
 	}
-	menu := []string{
-		"display-menu", "-T", "ambient", "-x", "M", "-y", "S",
-		"Key help  (prefix ?)", "?", `display-popup -w 64 -h 20 -E "` + o.Exe + ` help --esc"`,
-		"Settings  (prefix *)", "*", `display-popup -w 80 -h 16 -E "AMBIENT_POPUP=1 ` + o.Exe + ` setup-here"`,
+	if err := run([]string{"bind-key", "-n", "MouseDown1StatusRight", "display-popup", "-w", "64", "-h", "20", "-E", o.Exe + " help --esc"}, false); err != nil {
+		return err
 	}
-	if err := run(append([]string{"bind-key", "-n", "MouseDown1StatusRight"}, menu...), false); err != nil {
+	if err := run([]string{"bind-key", "-n", "MouseDown3StatusRight", "display-popup", "-w", "80", "-h", "16", "-E", setupCmd}, false); err != nil {
 		return err
 	}
 	if list, err := out([]string{"list-windows", "-t", Name, "-F", "#{window_index}"}); err == nil {

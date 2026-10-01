@@ -182,7 +182,7 @@ func cmdHelp(waitEsc bool) {
 	fmt.Println("    C-b ?        this help")
 	fmt.Println("    C-b *        settings for this screen")
 	fmt.Println("    C-b d        detach")
-	fmt.Println("    click ⌨ ? or * setup in the status bar — same popups")
+	fmt.Println("    click ? keys — this help · right-click — settings")
 	fmt.Println("    click a window name — switch screen")
 	if waitEsc && stdinIsTty() {
 		fmt.Println()
@@ -215,10 +215,7 @@ func waitEscape() {
 		if err != nil || n == 0 {
 			return
 		}
-		if buf[0] == 3 {
-			return
-		}
-		if buf[0] == 0x1b && n == 1 {
+		if buf[0] == 3 || (buf[0] == 0x1b && n == 1) {
 			return
 		}
 	}
