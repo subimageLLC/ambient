@@ -5,3 +5,4 @@ needs    = []
 glyphs   = "plain"
 reads    = []
 contacts = []
+keys     = ["btop's own keys apply inside the screen — F1 help · F2 options"]

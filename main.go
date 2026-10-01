@@ -242,9 +242,17 @@ func cmdSetup(args []string) {
 	}
 	for _, target := range targets {
 		if target.Setup == "" {
-			fmt.Printf("\n%s has no terminal setup — its settings live on-screen:\n", target.Name)
+			fmt.Printf("\n  %s — settings live on-screen:\n", target.Name)
+			if len(target.Keys) == 0 {
+				fmt.Println("    no settings")
+			}
 			for _, k := range target.Keys {
-				fmt.Printf("  %s\n", k)
+				fmt.Printf("    %s\n", k)
+			}
+			if os.Getenv("AMBIENT_POPUP") == "1" {
+				fmt.Println()
+				fmt.Println("  esc to close")
+				waitEscape()
 			}
 			continue
 		}

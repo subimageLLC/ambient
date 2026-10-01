@@ -168,7 +168,7 @@ func Build(o Options) error {
 	if err := run([]string{"bind-key", "?", "display-popup", "-w", "64", "-h", "20", "-E", helpCmd}, false); err != nil {
 		return err
 	}
-	setupCmd := o.Exe + ` setup "$(tmux display-message -p '#W')"`
+	setupCmd := `AMBIENT_POPUP=1 ` + o.Exe + ` setup "$(tmux display-message -p '#W')"`
 	if err := run([]string{"bind-key", "*", "display-popup", "-w", "80", "-h", "16", "-E", setupCmd}, false); err != nil {
 		return err
 	}
