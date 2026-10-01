@@ -1,0 +1,9 @@
+name     = "net"
+mode     = "passive"
+entry    = "screen.sh"
+setup    = "setup.sh"
+refresh  = 30
+needs    = ["network"]
+glyphs   = "blocks"
+reads    = ["~/.config/ambient/screens/net.conf", "~/.cache/ambient/net.*.hist"]
+contacts = []

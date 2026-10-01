@@ -1,0 +1,11 @@
+name     = "coins"
+mode     = "interactive"
+entry    = "coins.py"
+needs    = ["python3", "network"]
+glyphs   = "braille"
+reads    = ["~/.config/ambient/screens/coins.conf", "~/.cache/ambient/screen-coins*"]
+contacts = ["api.coingecko.com"]
+
+# first run opens a portfolio picker (popular coins grouped by network).
+# keys: up/down (j/k) select coin · a pick coins · x remove coin
+#       tab (or d/w/m/y, [/]) timeframe · r force refresh · q quits the pane

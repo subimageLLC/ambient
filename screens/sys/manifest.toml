@@ -1,0 +1,7 @@
+name     = "sys"
+mode     = "interactive"
+entry    = "screen.sh"
+needs    = []
+glyphs   = "plain"
+reads    = []
+contacts = []
