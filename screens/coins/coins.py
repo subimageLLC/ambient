@@ -371,7 +371,10 @@ def draw(stdscr):
     curses.init_pair(1, curses.COLOR_CYAN, -1)
     curses.init_pair(2, curses.COLOR_GREEN, -1)
     curses.init_pair(3, curses.COLOR_RED, -1)
-    curses.init_pair(4, 8, -1)
+    try:
+        curses.init_pair(4, 244, -1)
+    except curses.error:
+        curses.init_pair(4, 8, -1)
     curses.init_pair(5, curses.COLOR_WHITE, -1)
     try:
         curses.init_pair(6, 237, -1)
@@ -409,9 +412,12 @@ def draw(stdscr):
         coin_id, sym = IDS[sel]
         cd = chart_data(coin_id, tfs[tfi][1])
         prices = [p[1] for p in (cd or {}).get("prices", [])]
+        pts = [p[0] for p in (cd or {}).get("prices", [])]
         vols = [v[1] for v in (cd or {}).get("total_volumes", [])]
 
-        ph, vh = 11, 2
+        frac = min(0.75, 0.45 + max(0, h - 25) * 0.005)
+        ph = max(6, int(h * frac))
+        vh = max(2, ph // 8)
         cw = max(w - 14, 10)
         price_rows, lo, hi, last_row = line_grid(prices, ph, cw)
         vol_rows = vol_grid(vols, vh, cw)
@@ -450,11 +456,35 @@ def draw(stdscr):
                 msg = "loading chart…"
             stdscr.addstr(y + ph // 2, 3, msg, curses.color_pair(4))
         else:
-            stdscr.addstr(y, 2 + cw + 1, f"${fmt(hi)}", curses.color_pair(4))
-            stdscr.addstr(y + ph // 2, 2 + cw + 1, f"${fmt((hi + lo) / 2)}", curses.color_pair(4))
-            stdscr.addstr(y + ph - 1, 2 + cw + 1, f"${fmt(lo)}", curses.color_pair(4))
+            marks = [0.0, 0.25, 0.5, 0.75, 1.0] if ph >= 20 else [0.0, 0.5, 1.0]
+            for f in marks:
+                v = hi - f * (hi - lo)
+                try:
+                    stdscr.addstr(y + int(f * (ph - 1)), 2 + cw + 1, f"${fmt(v)}", curses.color_pair(4))
+                except curses.error:
+                    pass
         y += ph
         stdscr.addstr(y, 1, "─" * (cw + 2), curses.color_pair(4))
+        if len(pts) >= 2:
+            days = tfs[tfi][1]
+            t0, t1 = pts[0] / 1000, pts[-1] / 1000
+            for i in range(4):
+                fx = i / 3
+                t = t0 + (t1 - t0) * fx
+                if days <= 1:
+                    lab = time.strftime("%H:%M", time.localtime(t))
+                elif days <= 7:
+                    lab = time.strftime("%a %d", time.localtime(t))
+                elif days <= 90:
+                    lab = time.strftime("%b %d", time.localtime(t))
+                else:
+                    lab = time.strftime("%b %Y", time.localtime(t))
+                lx = 1 + int(fx * cw) - len(lab) // 2
+                lx = max(1, min(lx, 1 + cw + 1 - len(lab)))
+                try:
+                    stdscr.addstr(y, lx, lab, curses.color_pair(4))
+                except curses.error:
+                    pass
         y += 1
         for r, row in enumerate(vol_rows):
             stdscr.addstr(y + r, 1, row, curses.color_pair(7))
