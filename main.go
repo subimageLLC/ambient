@@ -202,19 +202,24 @@ func waitEscape() {
 	raw := exec.Command("stty", "raw", "-echo")
 	raw.Stdin = os.Stdin
 	raw.Run()
-	buf := make([]byte, 1)
+	defer func() {
+		restore := exec.Command("stty", strings.TrimSpace(string(saved)))
+		restore.Stdin = os.Stdin
+		restore.Run()
+	}()
+	buf := make([]byte, 256)
 	for {
 		n, err := os.Stdin.Read(buf)
 		if err != nil || n == 0 {
-			break
+			return
 		}
-		if buf[0] == 0x1b || buf[0] == 3 {
-			break
+		if buf[0] == 3 {
+			return
+		}
+		if buf[0] == 0x1b && n == 1 {
+			return
 		}
 	}
-	restore := exec.Command("stty", strings.TrimSpace(string(saved)))
-	restore.Stdin = os.Stdin
-	restore.Run()
 }
 
 func cmdSetup(args []string) {
