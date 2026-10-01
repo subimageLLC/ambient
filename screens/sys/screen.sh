@@ -20,7 +20,7 @@ is_light && THEME=solarized_light
 
 if command -v btop >/dev/null 2>&1; then
     mkdir -p "$CACHE"
-    printf 'theme = "%s"\n' "$THEME" >"$CACHE/btop.conf"
+    printf 'color_theme = "%s"\n' "$THEME" >"$CACHE/btop.conf"
     exec btop -c "$CACHE/btop.conf"
 elif command -v htop >/dev/null 2>&1; then
     exec htop
