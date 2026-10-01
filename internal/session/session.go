@@ -150,9 +150,6 @@ func Build(o Options) error {
 			return err
 		}
 	}
-	if err := run([]string{"unbind-key", "d"}, false); err != nil {
-		return err
-	}
 	for _, k := range []string{"n", "C-n", "N", "C-N"} {
 		if err := run([]string{"bind-key", k, "next-window"}, false); err != nil {
 			return err
