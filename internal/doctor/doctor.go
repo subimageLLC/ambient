@@ -34,7 +34,14 @@ func Run(c cfg.Config, screens []screen.Screen) {
 	fmt.Println("ambient doctor")
 	fmt.Println()
 	fmt.Printf("tmux        %s\n", check("tmux"))
-	fmt.Printf("python3     %s\n", check("python3"))
+	for _, s := range screens {
+		for _, need := range s.Needs {
+			if need == "network" {
+				continue
+			}
+			fmt.Printf("%-11s %s  (for %s)\n", need, check(need), s.Name)
+		}
+	}
 	t := os.Getenv("TERM")
 	note := ""
 	if t == "" || t == "dumb" {

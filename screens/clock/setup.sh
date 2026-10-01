@@ -20,21 +20,13 @@ if ! curl -s --max-time 10 "https://wttr.in/$ENC?format=j1" | head -c 1 | grep -
 fi
 echo ok
 
-printf 'label (optional, shown under the clock): '
+printf 'label (optional, e.g. town name): '
 read -r LABEL
-
-printf 'clock format — 24h or 12h [24h]: '
-read -r FMT
-case "$FMT" in
-    12*) FMT=12h ;;
-    *) FMT=24h ;;
-esac
 
 TMP=$CONF.tmp
 {
     echo "loc=$ENC"
     echo "label=$LABEL"
-    echo "format=$FMT"
 } >"$TMP"
 mv "$TMP" "$CONF"
 echo "saved $CONF"

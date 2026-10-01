@@ -1,10 +1,11 @@
 name     = "clock"
 mode     = "interactive"
-entry    = "clock.py"
+entry    = "screen.sh"
 setup    = "setup.sh"
-needs    = ["python3", "network"]
-glyphs   = "blocks"
-reads    = ["~/.config/ambient/screens/clock.conf", "~/.cache/ambient/fetch/weather.json"]
-contacts = ["wttr.in"]
+needs    = ["toilet", "jq", "network"]
+glyphs   = "plain"
+reads    = ["~/.config/ambient/screens/clock.conf", "~/.cache/ambient/weather.json", "~/.cache/ambient/weather-alerts.json"]
+contacts = ["wttr.in", "api.weather.gov"]
 
-# keys: s set location (zipcode/city/lat,lon) · q quits the pane
+# faithful port of the kiosk's screen-clock: toilet mono12 time (gray 244),
+# white date, wttr.in rows in °F with ▲/▼ hi-lo, NWS alert line.

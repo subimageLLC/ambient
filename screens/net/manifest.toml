@@ -1,11 +1,11 @@
 name     = "net"
 mode     = "interactive"
-entry    = "net.py"
+entry    = "screen.sh"
 setup    = "setup.sh"
 setup_optional = true
-needs    = ["network", "python3"]
-glyphs   = "braille"
+needs    = ["gping", "network"]
+glyphs   = "plain"
 reads    = ["~/.config/ambient/screens/net.conf"]
 contacts = []
 
-# keys: s set wan target · q quits the pane
+# faithful port of the kiosk's net window: gping gateway + wan
