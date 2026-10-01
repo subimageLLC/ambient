@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"ambient/internal/cfg"
@@ -16,6 +17,39 @@ func check(exe string) string {
 		return "ok"
 	}
 	return "missing"
+}
+
+func pkgManager() string {
+	if _, err := exec.LookPath("brew"); err == nil {
+		return "brew"
+	}
+	b, err := os.ReadFile("/etc/os-release")
+	if err == nil {
+		id := strings.ToLower(string(b))
+		switch {
+		case strings.Contains(id, "debian") || strings.Contains(id, "ubuntu") || strings.Contains(id, "raspbian"):
+			return "apt"
+		case strings.Contains(id, "fedora"):
+			return "dnf"
+		case strings.Contains(id, "arch"):
+			return "pacman"
+		case strings.Contains(id, "alpine"):
+			return "apk"
+		}
+	}
+	return ""
+}
+
+func installHint(dep string) string {
+	pm := pkgManager()
+	if pm == "" {
+		return ""
+	}
+	verb := "install"
+	if pm == "pacman" {
+		verb = "-S"
+	}
+	return fmt.Sprintf("→ %s %s %s", pm, verb, dep)
 }
 
 func probe(url string) string {
@@ -39,7 +73,14 @@ func Run(c cfg.Config, screens []screen.Screen) {
 			if need == "network" {
 				continue
 			}
-			fmt.Printf("%-11s %s  (for %s)\n", need, check(need), s.Name)
+			status := check(need)
+			line := fmt.Sprintf("%-11s %-7s (for %s)", need, status, s.Name)
+			if status == "missing" {
+				if h := installHint(need); h != "" {
+					line += "  " + h
+				}
+			}
+			fmt.Println(line)
 		}
 	}
 	t := os.Getenv("TERM")

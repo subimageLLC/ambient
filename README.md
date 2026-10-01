@@ -47,10 +47,20 @@ pause/unpause rotation, `Ctrl-b d` detach.
 
 ## Requirements
 
-- tmux 3.2+
-- python3 (for the coins screen)
-- a terminal with a nerd font for braille charts (`ambient doctor` prints a
-  glyph test card; set `glyphs = "ascii"` to degrade gracefully)
+- **Core**: tmux 3.2+ — that's it. The binary is static and dependency-free
+- **Screens declare their own deps** in their manifest (`needs = ["toilet", "jq", ...]`).
+  `ambient doctor` checks every one and prints the install command for your
+  package manager (brew / apt / dnf / pacman / apk). A screen whose deps are
+  missing shows an in-pane install hint and recovers automatically once you
+  install them — no session rebuild needed
+- python3 + a nerd font for the coins screen (`ambient doctor` prints a glyph
+  test card; set `glyphs = "ascii"` to degrade gracefully)
+
+### Why toilet?
+
+The clock's big digits come from `toilet -f mono12` — the same renderer the
+original kiosk uses, so the look is identical everywhere. toilet, jq, gping,
+and btop are packaged in Debian, Ubuntu, Fedora, Arch, and Homebrew.
 
 ## Screen contract
 

@@ -12,11 +12,17 @@ elif command -v route >/dev/null 2>&1; then
     GW=$(route -n get default 2>/dev/null | awk '/gateway/ {print $2; exit}')
 fi
 
-command -v gping >/dev/null 2>&1 || {
-    printf 'gping is required for the net screen\n'
-    printf '  macOS: brew install gping   Debian: apt install gping\n'
-    sleep 3600
-    exit 1
-}
+while ! command -v gping >/dev/null 2>&1; do
+    HINT='install gping with your package manager'
+    command -v brew >/dev/null 2>&1 && HINT='brew install gping'
+    command -v apt-get >/dev/null 2>&1 && HINT='sudo apt install gping'
+    command -v dnf >/dev/null 2>&1 && HINT='sudo dnf install gping'
+    command -v pacman >/dev/null 2>&1 && HINT='sudo pacman -S gping'
+    printf '\033[H\033[2J'
+    printf ' net: missing gping\n\n'
+    printf '  %s\n\n' "$HINT"
+    printf ' this pane recovers automatically once installed\n'
+    sleep 30
+done
 
 exec gping ${GW:+"$GW"} "$WAN"

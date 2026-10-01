@@ -25,6 +25,31 @@ OFF="\033[0m"
 WFILE="${AMBIENT_CACHE_DIR:-$HOME/.cache/ambient}/weather.json"
 AFILE="${AMBIENT_CACHE_DIR:-$HOME/.cache/ambient}/weather-alerts.json"
 
+missing_deps() {
+    local m=""
+    command -v toilet >/dev/null 2>&1 || m="$m toilet"
+    command -v jq >/dev/null 2>&1 || m="$m jq"
+    printf '%s' "$m"
+}
+
+install_hint() {
+    if command -v brew >/dev/null 2>&1; then echo "brew install$1"
+    elif command -v apt-get >/dev/null 2>&1; then echo "sudo apt install$1"
+    elif command -v dnf >/dev/null 2>&1; then echo "sudo dnf install$1"
+    elif command -v pacman >/dev/null 2>&1; then echo "sudo pacman -S$1"
+    else echo "install$1 with your package manager"
+    fi
+}
+
+while [ -n "$(missing_deps)" ]; do
+    M=$(missing_deps)
+    printf '\033[H\033[2J'
+    printf ' clock: missing%s\n\n' "$M"
+    printf '  %s\n\n' "$(install_hint "$M")"
+    printf ' this pane recovers automatically once installed\n'
+    sleep 30
+done
+
 mtime() { stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || echo 0; }
 
 c2f() {
