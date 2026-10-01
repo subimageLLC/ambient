@@ -92,6 +92,8 @@ func main() {
 		cmdHelp(len(os.Args) > 2 && os.Args[2] == "--esc")
 	case "setup":
 		cmdSetup(os.Args[2:])
+	case "setup-here":
+		cmdSetup([]string{currentWindow()})
 	case "version":
 		fmt.Println("ambient", version)
 	default:

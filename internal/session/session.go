@@ -142,8 +142,8 @@ func Build(o Options) error {
 		{"set-option", "-g", "status-left-length", "40"},
 		{"set-option", "-g", "status-right-length", "40"},
 		{"set-option", "-g", "status-style", "bg=#002b36,fg=#93a1a1"},
-		{"set-option", "-g", "status-left", "#[fg=#002b36,bg=#2aa198,bold] ambient #[default]#[fg=#93a1a1,bold] ? keys #[default]"},
-		{"set-option", "-g", "status-right", "#[fg=#93a1a1,bold]* setup #[default]#[fg=#586e75]· %H:%M %d-%b "},
+		{"set-option", "-g", "status-left", "#[fg=#002b36,bg=#2aa198,bold] ambient #[default]"},
+		{"set-option", "-g", "status-right", "#[fg=#93a1a1,bold]? keys #[default]#[fg=#586e75]· #[default]#[fg=#93a1a1,bold]* setup #[default]#[fg=#586e75]· %H:%M %d-%b "},
 		{"set-option", "-g", "window-status-style", "fg=#586e75"},
 		{"set-option", "-g", "window-status-current-style", "fg=#002b36,bg=#2aa198,bold"},
 		{"set-option", "-g", "detach-on-destroy", "off"},
@@ -171,14 +171,18 @@ func Build(o Options) error {
 	if err := run([]string{"bind-key", "?", "display-popup", "-w", "64", "-h", "20", "-E", helpCmd}, false); err != nil {
 		return err
 	}
-	setupCmd := `AMBIENT_POPUP=1 ` + o.Exe + ` setup "$(tmux display-message -p '#W')"`
+	setupCmd := `AMBIENT_POPUP=1 ` + o.Exe + ` setup-here`
 	if err := run([]string{"bind-key", "*", "display-popup", "-w", "80", "-h", "16", "-E", setupCmd}, false); err != nil {
 		return err
 	}
-	if err := run([]string{"bind-key", "-n", "MouseDown1StatusLeft", "display-popup", "-w", "64", "-h", "20", "-E", o.Exe + " help --esc"}, false); err != nil {
-		return err
+	menu := []string{
+		"display-menu", "-T", "ambient", "-x", "M", "-y", "S",
+		"",
+		"Key help  (prefix ?)", "?", `display-popup -w 64 -h 20 -E "` + o.Exe + ` help --esc"`,
+		"",
+		"Settings  (prefix *)", "*", `display-popup -w 80 -h 16 -E "AMBIENT_POPUP=1 ` + o.Exe + ` setup-here"`,
 	}
-	if err := run([]string{"bind-key", "-n", "MouseDown1StatusRight", "display-popup", "-w", "80", "-h", "16", "-E", setupCmd}, false); err != nil {
+	if err := run(append([]string{"bind-key", "-n", "MouseDown1StatusRight"}, menu...), false); err != nil {
 		return err
 	}
 	if list, err := out([]string{"list-windows", "-t", Name, "-F", "#{window_index}"}); err == nil {
