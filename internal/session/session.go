@@ -177,9 +177,7 @@ func Build(o Options) error {
 	}
 	menu := []string{
 		"display-menu", "-T", "ambient", "-x", "M", "-y", "S",
-		"",
 		"Key help  (prefix ?)", "?", `display-popup -w 64 -h 20 -E "` + o.Exe + ` help --esc"`,
-		"",
 		"Settings  (prefix *)", "*", `display-popup -w 80 -h 16 -E "AMBIENT_POPUP=1 ` + o.Exe + ` setup-here"`,
 	}
 	if err := run(append([]string{"bind-key", "-n", "MouseDown1StatusRight"}, menu...), false); err != nil {
