@@ -147,6 +147,7 @@ func Build(o Options) error {
 		{"set-option", "-g", "window-status-style", "fg=#586e75"},
 		{"set-option", "-g", "window-status-current-style", "fg=#002b36,bg=#2aa198,bold"},
 		{"set-option", "-g", "detach-on-destroy", "off"},
+		{"set-option", "-ga", "update-environment", " COLORFGBG"},
 	}
 	for _, args := range styling {
 		if err := run(args, false); err != nil {

@@ -8,6 +8,7 @@
 - [ ] tag v0.2.0, cut the first release with binaries
 
 ## screens
+- [ ] sys theme detection: KDE (kreadconfig kdeglobals ColorScheme) and hyprland/sway equivalents; OSC 11 terminal-background query for terminal-theme ≠ OS-theme cases (unreliable through tmux)
 - [ ] coins: check axis labels fit the pi's 88x25 pane (may need fewer ticks at small widths)
 - [ ] coins: migrate to `ambient fetch` / `ambient chart` subcommands — one implementation of backoff + braille rendering instead of the vendored copy
 - [ ] the kiosk migration: private screens (sec rail w/ unifi, tailnet, lan census, docker, logs) into the kiosk's `~/.config/ambient/screens/`
