@@ -180,6 +180,8 @@ func cmdHelp(waitEsc bool) {
 	fmt.Println("    C-b ?        this help")
 	fmt.Println("    C-b *        settings for this screen")
 	fmt.Println("    C-b d        detach")
+	fmt.Println("    click ⌨ ? or * setup in the status bar — same popups")
+	fmt.Println("    click a window name — switch screen")
 	if waitEsc && stdinIsTty() {
 		fmt.Println()
 		fmt.Println("  esc to close")

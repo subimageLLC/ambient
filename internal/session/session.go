@@ -135,12 +135,13 @@ func Build(o Options) error {
 		}
 	}
 	styling := [][]string{
+		{"set-option", "-g", "mouse", "on"},
 		{"set-option", "-g", "status", "on"},
 		{"set-option", "-g", "status-interval", "5"},
 		{"set-option", "-g", "status-position", "bottom"},
 		{"set-option", "-g", "status-style", "bg=#002b36,fg=#93a1a1"},
-		{"set-option", "-g", "status-left", "#[fg=#002b36,bg=#2aa198,bold] ambient #[default] "},
-		{"set-option", "-g", "status-right", "#[fg=#586e75]⌨ ? keys · * setup #[default]#[fg=#586e75]%H:%M %d-%b "},
+		{"set-option", "-g", "status-left", "#[fg=#002b36,bg=#2aa198,bold] ambient #[default]#[fg=#586e75,bold] ⌨ ? #[default]"},
+		{"set-option", "-g", "status-right", "#[fg=#586e75,bold]* setup #[default]#[fg=#586e75]· %H:%M %d-%b "},
 		{"set-option", "-g", "window-status-style", "fg=#586e75"},
 		{"set-option", "-g", "window-status-current-style", "fg=#002b36,bg=#2aa198,bold"},
 		{"set-option", "-g", "detach-on-destroy", "off"},
@@ -170,6 +171,12 @@ func Build(o Options) error {
 	}
 	setupCmd := `AMBIENT_POPUP=1 ` + o.Exe + ` setup "$(tmux display-message -p '#W')"`
 	if err := run([]string{"bind-key", "*", "display-popup", "-w", "80", "-h", "16", "-E", setupCmd}, false); err != nil {
+		return err
+	}
+	if err := run([]string{"bind-key", "-n", "MouseDown1StatusLeft", "display-popup", "-w", "64", "-h", "20", "-E", o.Exe + " help --esc"}, false); err != nil {
+		return err
+	}
+	if err := run([]string{"bind-key", "-n", "MouseDown1StatusRight", "display-popup", "-w", "80", "-h", "16", "-E", setupCmd}, false); err != nil {
 		return err
 	}
 	if list, err := out([]string{"list-windows", "-t", Name, "-F", "#{window_index}"}); err == nil {
