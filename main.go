@@ -89,7 +89,7 @@ func main() {
 			fmt.Printf("%-12s %-12s refresh=%ds%s\n", s.Name, s.Mode, s.Refresh, setup)
 		}
 	case "help":
-		cmdHelp()
+		cmdHelp(len(os.Args) > 2 && os.Args[2] == "--esc")
 	case "setup":
 		cmdSetup(os.Args[2:])
 	case "version":
@@ -143,7 +143,7 @@ func currentWindow() string {
 	return strings.TrimSpace(string(out))
 }
 
-func cmdHelp() {
+func cmdHelp(waitEsc bool) {
 	screens := loadScreens(cfg.Default())
 	name := currentWindow()
 	fmt.Println()
@@ -180,7 +180,39 @@ func cmdHelp() {
 	fmt.Println("    C-b ?        this help")
 	fmt.Println("    C-b *        settings for this screen")
 	fmt.Println("    C-b d        detach")
+	if waitEsc && stdinIsTty() {
+		fmt.Println()
+		fmt.Println("  esc to close")
+		waitEscape()
+	}
 	fmt.Println()
+}
+
+func stdinIsTty() bool {
+	fi, err := os.Stdin.Stat()
+	return err == nil && fi.Mode()&os.ModeCharDevice != 0
+}
+
+func waitEscape() {
+	save := exec.Command("stty", "-g")
+	save.Stdin = os.Stdin
+	saved, _ := save.Output()
+	raw := exec.Command("stty", "raw", "-echo")
+	raw.Stdin = os.Stdin
+	raw.Run()
+	buf := make([]byte, 1)
+	for {
+		n, err := os.Stdin.Read(buf)
+		if err != nil || n == 0 {
+			break
+		}
+		if buf[0] == 0x1b || buf[0] == 3 {
+			break
+		}
+	}
+	restore := exec.Command("stty", strings.TrimSpace(string(saved)))
+	restore.Stdin = os.Stdin
+	restore.Run()
 }
 
 func cmdSetup(args []string) {

@@ -164,7 +164,7 @@ func Build(o Options) error {
 	if err := run([]string{"bind-key", "p", "run-shell", toggle + " \\; display-message \"rotation: toggled\""}, false); err != nil {
 		return err
 	}
-	helpCmd := o.Exe + ` help; echo " press enter to close"; read x`
+	helpCmd := o.Exe + ` help --esc`
 	if err := run([]string{"bind-key", "?", "display-popup", "-w", "64", "-h", "20", "-E", helpCmd}, false); err != nil {
 		return err
 	}
