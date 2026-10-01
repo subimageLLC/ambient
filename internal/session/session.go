@@ -175,6 +175,7 @@ func Build(o Options) error {
 	if list, err := out([]string{"list-windows", "-t", Name, "-F", "#{window_index}"}); err == nil {
 		for _, idx := range strings.Fields(list) {
 			run([]string{"set-window-option", "-t", Name + ":" + idx, "remain-on-exit", "on"}, false)
+			run([]string{"set-window-option", "-t", Name + ":" + idx, "window-size", "latest"}, false)
 		}
 	}
 	return nil
