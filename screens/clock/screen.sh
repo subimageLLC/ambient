@@ -67,11 +67,13 @@ weather() {
     local nowF desc hi lo tmhi tmlo tmdesc
     nowF=$(jq -r '.current_condition[0].temp_F' "$WFILE" 2>/dev/null)
     desc=$(jq -r '.current_condition[0].weatherDesc[0].value' "$WFILE" 2>/dev/null | xargs)
+    desc=${desc//\\/}
     hi=$(c2f "$(jq -r '.weather[0].maxtempC' "$WFILE")")
     lo=$(c2f "$(jq -r '.weather[0].mintempC' "$WFILE")")
     tmhi=$(c2f "$(jq -r '.weather[1].maxtempC' "$WFILE")")
     tmlo=$(c2f "$(jq -r '.weather[1].mintempC' "$WFILE")")
     tmdesc=$(jq -r '.weather[1].hourly[4].weatherDesc[0].value // .weather[1].hourly[0].weatherDesc[0].value // "?"' "$WFILE" 2>/dev/null | xargs)
+    tmdesc=${tmdesc//\\/}
 
     W_OUT=()
     W_PLAIN=()
@@ -95,6 +97,7 @@ weather() {
         ev=$(jq -r '[.features[].properties.event] | join(", ")' "$AFILE" 2>/dev/null)
         ends=$(jq -r '.features[0].properties.ends // empty' "$AFILE" 2>/dev/null)
         if [ -n "$ev" ]; then
+            ev=${ev//\\/}
             local col=$YEL
             [ "$sev" = Extreme ] || [ "$sev" = Severe ] && col=$RED
             local when=""

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import curses
+import glob
 import json
 import locale
 import os
@@ -573,7 +574,11 @@ def draw(stdscr):
                 os.unlink(MARKETS_CACHE)
             except FileNotFoundError:
                 pass
-            os.system(f"rm -f {CHART_CACHE}.*")
+            for f in glob.glob(CHART_CACHE + ".*"):
+                try:
+                    os.unlink(f)
+                except OSError:
+                    pass
 
 
 def main():

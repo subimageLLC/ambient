@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -33,6 +34,9 @@ type Result struct {
 }
 
 func Fetch(url, name string, ttl, timeout time.Duration, ua string) (Result, error) {
+	if strings.ContainsAny(name, "/\\") || strings.Contains(name, "..") {
+		return Result{}, fmt.Errorf("invalid cache name %q", name)
+	}
 	os.MkdirAll(dir(), 0o755)
 	if body, err := os.ReadFile(cachePath(name)); err == nil {
 		if fi, err := os.Stat(cachePath(name)); err == nil && time.Since(fi.ModTime()) < ttl {

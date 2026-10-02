@@ -16,6 +16,22 @@ func setup(t *testing.T) {
 	t.Cleanup(func() { os.Unsetenv("AMBIENT_CACHE_DIR") })
 }
 
+func TestFetchRejectsBadNames(t *testing.T) {
+	setup(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("x"))
+	}))
+	defer srv.Close()
+	for _, name := range []string{"../../evil", "a/b", `a\b`, ".."} {
+		if _, err := Fetch(srv.URL, name, time.Minute, time.Second, "test"); err == nil {
+			t.Errorf("name %q should be rejected", name)
+		}
+	}
+	if _, err := Fetch(srv.URL, "coins.btc.30", time.Minute, time.Second, "test"); err != nil {
+		t.Errorf("plain name rejected: %v", err)
+	}
+}
+
 func TestFetchFreshThenCache(t *testing.T) {
 	setup(t)
 	hits := 0

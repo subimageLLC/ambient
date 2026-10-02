@@ -274,7 +274,7 @@ func unconfigured(screens []screen.Screen) []string {
 		if s.Setup == "" || s.SetupOptional || len(s.Reads) == 0 {
 			continue
 		}
-		p := strings.ReplaceAll(s.Reads[0], "~", os.Getenv("HOME"))
+		p := filepath.Join(os.Getenv("HOME"), strings.TrimPrefix(s.Reads[0], "~"))
 		if strings.Contains(p, "*") {
 			continue
 		}
