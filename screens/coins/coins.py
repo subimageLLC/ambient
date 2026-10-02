@@ -4,6 +4,7 @@ import glob
 import json
 import locale
 import os
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -149,16 +150,30 @@ def portfolio_editor(stdscr, chosen):
     flt = ""
     cur = 0
     base = 0
+    frame = 0
     while True:
+        now = time.time()
         rows = catalog_view(flt)
-        if len(flt.strip()) >= 2:
-            seen = {cid for _, cid, _, _ in CATALOG}
-            extra = [c for c in web_results(flt) if c[0] not in seen]
-            if extra:
-                rows.append(("header", "coingecko"))
-                for cid, sym, name, rank in extra[:20]:
-                    net = f"#{rank}" if rank else "—"
-                    rows.append(("coin", net, cid, sym, name))
+        q = flt.strip().lower()
+        searching = False
+        if len(q) >= 2:
+            web = search_cache.get(q)
+            if web is None:
+                searching = True
+                if search_state["flight"] is None and now - search_state["try"] >= 1.0:
+                    search_dispatch(q)
+            else:
+                seen = {cid for _, cid, _, _ in CATALOG}
+                extra = [c for c in web if c[0] not in seen]
+                if extra:
+                    rows.append(("header", "coingecko"))
+                    for cid, sym, name, rank in extra[:20]:
+                        net = f"#{rank}" if rank else "—"
+                        rows.append(("coin", net, cid, sym, name))
+                else:
+                    rows.append(("note", f'no coingecko matches for "{flt}"'))
+        if searching:
+            rows.append(("note", f"{SPINNER[frame % len(SPINNER)]} searching coingecko…"))
         coin_idx = [i for i, r in enumerate(rows) if r[0] == "coin"]
         if coin_idx and cur >= len(coin_idx):
             cur = len(coin_idx) - 1
@@ -184,6 +199,8 @@ def portfolio_editor(stdscr, chosen):
             r = rows[i]
             if r[0] == "header":
                 put(stdscr, y, 2, f"── {r[1]} ", curses.color_pair(1))
+            elif r[0] == "note":
+                put(stdscr, y, 2, r[1], curses.color_pair(4))
             else:
                 _, net, cid, sym, name = r
                 mark = "●" if cid in chosen else "○"
@@ -197,8 +214,11 @@ def portfolio_editor(stdscr, chosen):
         put(stdscr, h - 1, 1, foot[: max(1, w - 12)], curses.color_pair(5))
         put(stdscr, h - 1, w - 11, f"{len(chosen)} picked", curses.color_pair(4))
         stdscr.refresh()
+        frame += 1
+        stdscr.timeout(140 if searching else 500)
         k = stdscr.getch()
         if k == 27:
+            stdscr.timeout(500)
             return None
         elif k in (curses.KEY_UP, ord("k")) and coin_idx:
             cur = (cur - 1) % len(coin_idx)
@@ -211,6 +231,7 @@ def portfolio_editor(stdscr, chosen):
             else:
                 chosen.add(cid)
         elif k in (10, curses.KEY_ENTER):
+            stdscr.timeout(500)
             return chosen
         elif k in (8, 127, curses.KEY_BACKSPACE):
             flt = flt[:-1]
@@ -300,8 +321,10 @@ def web_results(q):
     url = "https://api.coingecko.com/api/v3/search?query=" + urllib.parse.quote(q)
     cache = os.path.join(CACHE_DIR, "screen-coins-search-" + urllib.parse.quote(q, safe="") + ".json")
     data = fetch(url, cache, 86400, min_gap=1, timeout=5)
+    if data is None:
+        return None
     out = []
-    for c in (data or {}).get("coins", []):
+    for c in data.get("coins", []):
         cid = c.get("id")
         if not cid:
             continue
@@ -309,6 +332,25 @@ def web_results(q):
         SEARCH_SYM[cid] = sym
         out.append((cid, sym, c.get("name") or cid, c.get("market_cap_rank")))
     return out
+
+
+search_cache = {}
+search_state = {"flight": None, "try": 0.0}
+
+
+def search_dispatch(q):
+    def work():
+        try:
+            res = web_results(q)
+        except Exception:
+            res = None
+        search_state["flight"] = None
+        if res is not None:
+            search_cache[q] = res
+
+    search_state["flight"] = q
+    search_state["try"] = time.time()
+    threading.Thread(target=work, daemon=True).start()
 
 
 def fmt(p):
