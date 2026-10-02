@@ -138,7 +138,7 @@ func Build(o Options) error {
 		return fmt.Errorf("tmux new-session: %w", err)
 	}
 	for _, s := range o.Screens[1:] {
-		if err := run([]string{"new-window", "-t", Name, "-n", s.Name, o.screenCommand(s)}, false); err != nil {
+		if err := run([]string{"new-window", "-d", "-t", Name, "-n", s.Name, o.screenCommand(s)}, false); err != nil {
 			return fmt.Errorf("tmux new-window %s: %w", s.Name, err)
 		}
 	}

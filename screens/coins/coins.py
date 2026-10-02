@@ -80,8 +80,6 @@ CACHE_DIR = os.environ.get("AMBIENT_CACHE_DIR", os.path.expanduser("~/.cache/amb
 MARKETS_CACHE = os.path.join(CACHE_DIR, "screen-coins.json")
 CHART_CACHE = os.path.join(CACHE_DIR, "screen-coins-chart.json")
 LOG = os.path.join(CACHE_DIR, "screen-coins.log")
-GLOBAL_URL = "https://api.coingecko.com/api/v3/global"
-GLOBAL_CACHE = os.path.join(CACHE_DIR, "screen-coins-global.json")
 
 
 def bust_markets():
@@ -639,12 +637,6 @@ def draw(stdscr):
             stdscr.getch()
             continue
         markets = fetch(api_markets, MARKETS_CACHE, 55)
-        glob = fetch(GLOBAL_URL, GLOBAL_CACHE, 300, min_gap=1)
-        gmc = gchg = None
-        if glob:
-            gd = glob.get("data") or {}
-            gmc = (gd.get("total_market_cap") or {}).get("usd")
-            gchg = gd.get("market_cap_change_percentage_24h_usd")
         if markets:
             fetched = max(fetched, os.path.getmtime(MARKETS_CACHE))
         by_id = {c.get("id"): c for c in (markets or [])}
@@ -727,11 +719,9 @@ def draw(stdscr):
             put(stdscr, y, 2 + cw + 1, compact(max(vols)), curses.color_pair(4))
         y += vh + 1
 
-        drawn = 0
         for i, (cid, s) in enumerate(IDS):
             if y + i >= h - 1:
                 break
-            drawn = i + 1
             c = by_id.get(cid)
             attr = curses.A_REVERSE | curses.color_pair(1) | curses.A_BOLD if i == sel else curses.color_pair(5)
             put(stdscr, y + i, 1, f" {s:<6}", attr)
@@ -745,13 +735,6 @@ def draw(stdscr):
                     mc = c.get("market_cap")
                     if mc is not None:
                         put(stdscr, y + i, 52, f"${compact(mc)}", curses.color_pair(4))
-        gy = y + drawn
-        if gmc and gy < h - 1:
-            s, d = chg(gchg)
-            arrow = "▲" if d > 0 else "▼"
-            put(stdscr, gy, 1, " market", curses.color_pair(4))
-            put(stdscr, gy, 9, f"${compact(gmc)}", curses.color_pair(5) | curses.A_BOLD)
-            put(stdscr, gy, 24, f"{arrow} {s:>8} 24h", curses.color_pair(2 if d > 0 else 3))
 
         age = int(time.time() - os.path.getmtime(MARKETS_CACHE)) if os.path.exists(MARKETS_CACHE) else 9999
         stale = " STALE" if age > 300 else ""

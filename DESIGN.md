@@ -115,9 +115,8 @@ than a framework. Anything user-facing follows these rules:
   stands in. Chain priority: base, eth, arb, op, polygon, bnb, avax,
   sol.
 - **Density scales with width.** The coins ticker grows a market-cap
-  column past 64 columns; the global market-cap row (`Σ market`, from
-  `/global`, cached 5m) closes the list when height allows. Narrow
-  panes drop columns rather than truncating rows.
+  column past 64 columns. Narrow panes drop columns rather than
+  truncating rows.
 - **Addresses are pasted, not typed** — filters preserve case so
   base58 and checksummed hex survive; contract lookups probe chains in
   a fixed order (base, ethereum, then the other majors) and stop at the
