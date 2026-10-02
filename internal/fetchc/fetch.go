@@ -78,9 +78,10 @@ func Fetch(url, name string, ttl, timeout time.Duration, ua string) (Result, err
 		wait := 30 * time.Second
 		if ra := resp.Header.Get("Retry-After"); ra != "" {
 			if secs, err := strconv.Atoi(ra); err == nil && secs > 0 {
-				wait = time.Duration(secs) * time.Second
+				wait = min(time.Duration(secs), time.Hour/time.Second) * time.Second
 			}
 		}
+		wait = max(wait, 30*time.Second)
 		fail(name, now, wait)
 		return Result{}, fmt.Errorf("HTTP 429 — next try in %s", wait)
 	}

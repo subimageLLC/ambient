@@ -1,6 +1,7 @@
 package fetchc
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -95,6 +96,48 @@ func TestFetch429BackoffAndStale(t *testing.T) {
 	}
 	if !res.Stale {
 		t.Fatal("stale flag not set")
+	}
+}
+
+func TestFetch429RetryAfterClamped(t *testing.T) {
+	cases := []struct {
+		name string
+		ra   string
+		want time.Duration
+	}{
+		{"below floor", "1", 30 * time.Second},
+		{"honored", "120", 120 * time.Second},
+		{"overflow", "99999999999999999999", 30 * time.Second},
+		{"huge but parseable", "9999999999", time.Hour},
+		{"garbage", "later", 30 * time.Second},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			setup(t)
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Retry-After", tc.ra)
+				w.WriteHeader(429)
+			}))
+			defer srv.Close()
+
+			if _, err := Fetch(srv.URL, "t4", time.Millisecond, 5*time.Second, "test"); err == nil {
+				t.Fatal("429 should error")
+			}
+			b, err := os.ReadFile(filepath.Join(dir(), "t4.state.json"))
+			if err != nil {
+				t.Fatalf("state file missing: %v", err)
+			}
+			var st struct {
+				RetryAt int64 `json:"retry_at"`
+			}
+			if err := json.Unmarshal(b, &st); err != nil {
+				t.Fatalf("bad state: %v", err)
+			}
+			got := time.Until(time.Unix(st.RetryAt, 0))
+			if got < tc.want-time.Second || got > tc.want+5*time.Second {
+				t.Fatalf("Retry-After %q: want backoff ~%s, got %s", tc.ra, tc.want, got)
+			}
+		})
 	}
 }
 

@@ -48,7 +48,10 @@ func main() {
 			die(err)
 		}
 	case "pause":
-		now := session.TogglePause()
+		now, err := session.TogglePause()
+		if err != nil {
+			die(err)
+		}
 		state := "resumed"
 		if now {
 			state = "paused"
@@ -76,11 +79,17 @@ func main() {
 	case "chart":
 		cmdChart(os.Args[2:])
 	case "doctor":
-		c, _ := cfg.Load()
+		c, err := cfg.Load()
+		if err != nil {
+			die(fmt.Errorf("config: %w", err))
+		}
 		screens := loadScreens(c)
 		doctor.Run(c, screens)
 	case "screens":
-		c, _ := cfg.Load()
+		c, err := cfg.Load()
+		if err != nil {
+			die(fmt.Errorf("config: %w", err))
+		}
 		for _, s := range loadScreens(c) {
 			setup := ""
 			if s.Setup != "" {
@@ -222,7 +231,10 @@ func waitEscape() {
 }
 
 func cmdSetup(args []string) {
-	c, _ := cfg.Load()
+	c, err := cfg.Load()
+	if err != nil {
+		die(fmt.Errorf("config: %w", err))
+	}
 	screens := loadScreens(c)
 	var targets []screen.Screen
 	if len(args) > 0 {
@@ -307,7 +319,7 @@ func cmdStart(rebuild bool) {
 
 	c, err := cfg.Load()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "ambient: config:", err)
+		die(fmt.Errorf("config: %w", err))
 	}
 	exe, err := os.Executable()
 	if err != nil {

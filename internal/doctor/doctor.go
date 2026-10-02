@@ -2,6 +2,7 @@ package doctor
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -54,14 +55,18 @@ func installHint(dep string) string {
 
 func probe(url string) string {
 	client := &http.Client{Timeout: 5 * time.Second}
-	req, _ := http.NewRequest("HEAD", url, nil)
+	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Set("User-Agent", "ambient")
 	resp, err := client.Do(req)
 	if err != nil {
 		return "unreachable"
 	}
-	resp.Body.Close()
-	return fmt.Sprintf("HTTP %d", resp.StatusCode)
+	defer resp.Body.Close()
+	io.Copy(io.Discard, io.LimitReader(resp.Body, 4<<10))
+	if resp.StatusCode >= 400 {
+		return fmt.Sprintf("reachable (HTTP %d)", resp.StatusCode)
+	}
+	return "reachable"
 }
 
 func Run(c cfg.Config, screens []screen.Screen) {

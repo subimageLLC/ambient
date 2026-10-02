@@ -66,7 +66,8 @@ func LoadManifest(dir string) (Manifest, error) {
 
 func SyncEmbedded(embedded embed.FS, dest string) error {
 	root := "screens"
-	return fs.WalkDir(embedded, root, func(path string, d fs.DirEntry, err error) error {
+	keep := map[string]bool{}
+	err := fs.WalkDir(embedded, root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -92,8 +93,47 @@ func SyncEmbedded(embedded embed.FS, dest string) error {
 		if err := os.WriteFile(target, data, mode); err != nil {
 			return err
 		}
+		if err := os.Chmod(target, mode); err != nil {
+			return err
+		}
+		keep[rel] = true
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	var dirs []string
+	err = filepath.WalkDir(dest, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				return nil
+			}
+			return err
+		}
+		if path == dest {
+			return nil
+		}
+		if d.IsDir() {
+			dirs = append(dirs, path)
+			return nil
+		}
+		rel, err := filepath.Rel(dest, path)
+		if err != nil {
+			return err
+		}
+		if !keep[rel] {
+			os.Remove(path)
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	sort.Sort(sort.Reverse(sort.StringSlice(dirs)))
+	for _, d := range dirs {
+		os.Remove(d)
+	}
+	return nil
 }
 
 func Discover(configDir, dataDir string, enabled []string) ([]Screen, error) {

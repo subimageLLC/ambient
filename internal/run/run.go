@@ -27,7 +27,7 @@ func Screen(dir string) error {
 		fmt.Print("\033[2J\033[H")
 		cmd := exec.Command(entry)
 		cmd.Env = os.Environ()
-		cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdout, os.Stdout, os.Stderr
+		cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 		err := cmd.Run()
 		wait := refresh
 		if err != nil {

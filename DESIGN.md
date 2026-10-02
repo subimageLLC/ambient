@@ -80,7 +80,7 @@ core-only (rotation, screen list, glyph mode). A manifest may declare a
   because screens call fetch as a subprocess).
 - Fresh within TTL → stdout, exit 0. Backing off → stale body to stdout if
   present, exit 3; nothing cached → exit 1. HTTP 429 → retry_at = now +
-  max(30s, Retry-After). Other errors → now + 10s.
+  max(30s, min(1h, Retry-After)). Other errors → now + 10s.
 
 ## Chart subcommand
 

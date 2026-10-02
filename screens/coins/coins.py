@@ -73,6 +73,17 @@ CATALOG = [
 ]
 CATALOG_SYM = {cid: sym for _, cid, sym, _ in CATALOG}
 CONFIG = os.path.join(os.environ.get("AMBIENT_CONFIG_DIR", os.path.expanduser("~/.config/ambient")), "screens", "coins.conf")
+CACHE_DIR = os.environ.get("AMBIENT_CACHE_DIR", os.path.expanduser("~/.cache/ambient"))
+MARKETS_CACHE = os.path.join(CACHE_DIR, "screen-coins.json")
+CHART_CACHE = os.path.join(CACHE_DIR, "screen-coins-chart.json")
+LOG = os.path.join(CACHE_DIR, "screen-coins.log")
+
+
+def bust_markets():
+    try:
+        os.unlink(MARKETS_CACHE)
+    except OSError:
+        pass
 
 
 def load_coins():
@@ -99,6 +110,7 @@ def save_coins(ids):
         for cid, sym in ids:
             f.write(f"{cid} {sym}\n")
     os.replace(tmp, CONFIG)
+    bust_markets()
 
 
 def catalog_view(flt):
@@ -139,6 +151,12 @@ def portfolio_editor(stdscr, chosen):
         if coin_idx and cur >= len(coin_idx):
             cur = len(coin_idx) - 1
         h, w = stdscr.getmaxyx()
+        if w < 30 or h < 8:
+            stdscr.erase()
+            put(stdscr, 0, 0, "terminal too small for the picker")
+            stdscr.refresh()
+            stdscr.getch()
+            return None
         body = max(h - 3, 1)
         disp = coin_idx[cur] if coin_idx else 0
         if disp < base:
@@ -146,35 +164,26 @@ def portfolio_editor(stdscr, chosen):
         if disp >= base + body:
             base = disp - body + 1
         stdscr.erase()
-        stdscr.addstr(0, 1, " pick your coins ", curses.color_pair(1) | curses.A_BOLD | curses.A_REVERSE)
-        try:
-            input_row = f" filter: {flt}▏"
-            stdscr.addstr(1, 1, input_row.ljust(w - 2)[: w - 2], curses.color_pair(5) | curses.A_REVERSE)
-        except curses.error:
-            pass
+        put(stdscr, 0, 1, " pick your coins ", curses.color_pair(1) | curses.A_BOLD | curses.A_REVERSE)
+        input_row = f" filter: {flt}▏"
+        put(stdscr, 1, 1, input_row.ljust(w - 2)[: w - 2], curses.color_pair(5) | curses.A_REVERSE)
         y = 3
         for i in range(base, min(len(rows), base + body)):
             r = rows[i]
             if r[0] == "header":
-                stdscr.addstr(y, 2, f"── {r[1]} ", curses.color_pair(1))
+                put(stdscr, y, 2, f"── {r[1]} ", curses.color_pair(1))
             else:
                 _, net, cid, sym, name = r
                 mark = "●" if cid in chosen else "○"
                 iscur = coin_idx and i == coin_idx[cur]
                 col = curses.color_pair(2 if cid in chosen else 5) | (curses.A_BOLD if iscur else 0)
                 line = f"{mark} {sym:<6} {name[:26]:<26}"
-                try:
-                    stdscr.addstr(y, 2, line, col | (curses.A_REVERSE if iscur else 0))
-                    stdscr.addstr(y, 2 + len(line) + 1, net, curses.color_pair(4) | (curses.A_REVERSE if iscur else 0))
-                except curses.error:
-                    pass
+                put(stdscr, y, 2, line, col | (curses.A_REVERSE if iscur else 0))
+                put(stdscr, y, 2 + len(line) + 1, net, curses.color_pair(4) | (curses.A_REVERSE if iscur else 0))
             y += 1
         foot = " space pick · enter = done (save & close) · esc cancel "
-        stdscr.addstr(h - 1, 1, foot[: w - 12], curses.color_pair(5))
-        try:
-            stdscr.addstr(h - 1, w - 11, f"{len(chosen)} picked", curses.color_pair(4))
-        except curses.error:
-            pass
+        put(stdscr, h - 1, 1, foot[: max(1, w - 12)], curses.color_pair(5))
+        put(stdscr, h - 1, w - 11, f"{len(chosen)} picked", curses.color_pair(4))
         stdscr.refresh()
         k = stdscr.getch()
         if k == 27:
@@ -196,16 +205,30 @@ def portfolio_editor(stdscr, chosen):
         elif 32 <= k < 127:
             flt += chr(k).lower()
 
-CACHE_DIR = os.environ.get("AMBIENT_CACHE_DIR", os.path.expanduser("~/.cache/ambient"))
-MARKETS_CACHE = os.path.join(CACHE_DIR, "screen-coins.json")
-CHART_CACHE = os.path.join(CACHE_DIR, "screen-coins-chart.json")
-LOG = os.path.join(CACHE_DIR, "screen-coins.log")
 EIGHTHS = " ▁▂▃▄▅▆▇█"
 SPINNER = "▁▃▅▇█▇▅▃"
 BRAILLE_BITS = [[1, 2, 4, 8], [16, 32, 64, 128]]
 RETRY_AT = {}
 LAST_NET = [0.0]
 MIN_CHART_GAP = 6
+
+
+def put(stdscr, y, x, s, attr=0):
+    h, w = stdscr.getmaxyx()
+    if 0 <= y < h and 0 <= x < w:
+        try:
+            stdscr.addstr(y, x, s[: w - x], attr)
+        except curses.error:
+            pass
+
+
+def putch(stdscr, y, x, ch, attr=0):
+    h, w = stdscr.getmaxyx()
+    if 0 <= y < h and 0 <= x < w:
+        try:
+            stdscr.addch(y, x, ch, attr)
+        except curses.error:
+            pass
 
 
 def logfail(msg):
@@ -242,7 +265,7 @@ def fetch(url, cache, maxage, min_gap=0):
         except urllib.error.HTTPError as e:
             wait = 30 if e.code == 429 else 10
             try:
-                wait = max(wait, int(e.headers.get("Retry-After") or 0))
+                wait = min(max(wait, int(e.headers.get("Retry-After") or 0)), 3600)
             except (TypeError, ValueError):
                 pass
             RETRY_AT[url] = now + wait
@@ -422,6 +445,12 @@ def draw(stdscr):
             + "&price_change_percentage=24h,7d"
         )
         h, w = stdscr.getmaxyx()
+        if w < 52 or h < 12:
+            stdscr.erase()
+            put(stdscr, 0, 0, f" terminal too small ({w}x{h}) — needs at least 52x12", curses.color_pair(4))
+            stdscr.refresh()
+            stdscr.getch()
+            continue
         markets = fetch(api_markets, MARKETS_CACHE, 55)
         if markets:
             fetched = max(fetched, os.path.getmtime(MARKETS_CACHE))
@@ -442,29 +471,29 @@ def draw(stdscr):
         grid_rows = {int((1 - f) * (ph * 4 - 1) // 4) for f in (0.25, 0.5, 0.75)}
 
         stdscr.erase()
-        stdscr.addstr(0, 0, f" {sym} ", curses.color_pair(1) | curses.A_BOLD | curses.A_REVERSE)
+        put(stdscr, 0, 0, f" {sym} ", curses.color_pair(1) | curses.A_BOLD | curses.A_REVERSE)
         c = by_id.get(coin_id)
         if c:
             s, d = chg(c.get("price_change_percentage_24h_in_currency"))
             arrow = "▲" if d > 0 else "▼"
             pair = curses.color_pair(2 if d > 0 else 3) | curses.A_BOLD
-            stdscr.addstr(0, 6, f" ${fmt(c.get('current_price'))}", curses.color_pair(5) | curses.A_BOLD)
-            stdscr.addstr(0, 6 + 12, f" {arrow} {s} 24h", pair)
+            put(stdscr, 0, 6, f" ${fmt(c.get('current_price'))}", curses.color_pair(5) | curses.A_BOLD)
+            put(stdscr, 0, 6 + 12, f" {arrow} {s} 24h", pair)
         for i, (lab, _) in enumerate(tfs):
             attr = curses.A_REVERSE if i == tfi else curses.color_pair(4)
             x = w - 4 - (len(tfs) - i) * 3
-            stdscr.addstr(0, x, f"[{lab}]", attr)
+            put(stdscr, 0, x, f"[{lab}]", attr)
 
         y = 2
         for r, row in enumerate(price_rows):
             for x, ch in enumerate(row):
                 if ch == "\u2800":
                     if r == last_row:
-                        stdscr.addch(y + r, 1 + x, "╌", curses.color_pair(6))
+                        putch(stdscr, y + r, 1 + x, "╌", curses.color_pair(6))
                     elif r in grid_rows:
-                        stdscr.addch(y + r, 1 + x, "·", curses.color_pair(6))
+                        putch(stdscr, y + r, 1 + x, "·", curses.color_pair(6))
                 else:
-                    stdscr.addch(y + r, 1 + x, ch, curses.color_pair(1))
+                    putch(stdscr, y + r, 1 + x, ch, curses.color_pair(1))
         if hi is None:
             url = chart_url(coin_id, tfs[tfi][1])
             retry_at = RETRY_AT.get(url, 0)
@@ -472,21 +501,15 @@ def draw(stdscr):
                 msg = f"rate-limited — chart retrying in {int(retry_at - time.time())}s"
             else:
                 msg = "loading chart…"
-            stdscr.addstr(y + ph // 2, 3, msg, curses.color_pair(4))
-            try:
-                stdscr.addstr(y + ph // 2, 3 + len(msg) + 1, SPINNER[anim % len(SPINNER)], curses.color_pair(1) | curses.A_BOLD)
-            except curses.error:
-                pass
+            put(stdscr, y + ph // 2, 3, msg, curses.color_pair(4))
+            put(stdscr, y + ph // 2, 3 + len(msg) + 1, SPINNER[anim % len(SPINNER)], curses.color_pair(1) | curses.A_BOLD)
         else:
             marks = [0.0, 0.25, 0.5, 0.75, 1.0] if ph >= 20 else [0.0, 0.5, 1.0]
             for f in marks:
                 v = hi - f * (hi - lo)
-                try:
-                    stdscr.addstr(y + int(f * (ph - 1)), 2 + cw + 1, f"${fmt(v)}", curses.color_pair(4))
-                except curses.error:
-                    pass
+                put(stdscr, y + int(f * (ph - 1)), 2 + cw + 1, f"${fmt(v)}", curses.color_pair(4))
         y += ph
-        stdscr.addstr(y, 1, "─" * (cw + 2), curses.color_pair(4))
+        put(stdscr, y, 1, "─" * (cw + 2), curses.color_pair(4))
         if len(pts) >= 2:
             days = tfs[tfi][1]
             t0, t1 = pts[0] / 1000, pts[-1] / 1000
@@ -503,42 +526,35 @@ def draw(stdscr):
                     lab = time.strftime("%b %Y", time.localtime(t))
                 lx = 1 + int(fx * cw) - len(lab) // 2
                 lx = max(1, min(lx, 1 + cw + 1 - len(lab)))
-                try:
-                    stdscr.addstr(y, lx, lab, curses.color_pair(4))
-                except curses.error:
-                    pass
+                put(stdscr, y, lx, lab, curses.color_pair(4))
         y += 1
         for r, row in enumerate(vol_rows):
-            stdscr.addstr(y + r, 1, row, curses.color_pair(7))
+            put(stdscr, y + r, 1, row, curses.color_pair(7))
         if vols:
-            stdscr.addstr(y, 2 + cw + 1, compact(max(vols)), curses.color_pair(4))
+            put(stdscr, y, 2 + cw + 1, compact(max(vols)), curses.color_pair(4))
         y += vh + 1
 
         for i, (cid, s) in enumerate(IDS):
+            if y + i >= h - 1:
+                break
             c = by_id.get(cid)
             attr = curses.A_REVERSE | curses.color_pair(1) | curses.A_BOLD if i == sel else curses.color_pair(5)
-            stdscr.addstr(y + i, 1, f" {s:<6}", attr)
+            put(stdscr, y + i, 1, f" {s:<6}", attr)
             if c:
-                stdscr.addstr(y + i, 9, f"${fmt(c.get('current_price')):>12}", curses.color_pair(5) | (curses.A_BOLD if i == sel else 0))
+                put(stdscr, y + i, 9, f"${fmt(c.get('current_price')):>12}", curses.color_pair(5) | (curses.A_BOLD if i == sel else 0))
                 s24, d24 = chg(c.get("price_change_percentage_24h_in_currency"))
                 s7, d7 = chg(c.get("price_change_percentage_7d_in_currency"))
-                stdscr.addstr(y + i, 24, f"{'▲' if d24 > 0 else '▼'} {s24:>8}", curses.color_pair(2 if d24 > 0 else 3))
-                stdscr.addstr(y + i, 37, f"{'▲' if d7 > 0 else '▼'} {s7:>8} 7d", curses.color_pair(2 if d7 > 0 else 3))
+                put(stdscr, y + i, 24, f"{'▲' if d24 > 0 else '▼'} {s24:>8}", curses.color_pair(2 if d24 > 0 else 3))
+                put(stdscr, y + i, 37, f"{'▲' if d7 > 0 else '▼'} {s7:>8} 7d", curses.color_pair(2 if d7 > 0 else 3))
 
         age = int(time.time() - os.path.getmtime(MARKETS_CACHE)) if os.path.exists(MARKETS_CACHE) else 9999
         stale = " STALE" if age > 300 else ""
         t = time.strftime("%H:%M", time.localtime(os.path.getmtime(MARKETS_CACHE))) if os.path.exists(MARKETS_CACHE) else "--:--"
         info = f"coingecko {t}{stale}"
         foot = " ↑↓ coin · a pick · x remove · tab tf · r refresh · q quit "
-        try:
-            stdscr.addstr(h - 1, 1, info, curses.color_pair(4))
-        except curses.error:
-            pass
-        try:
-            fx = max(len(info) + 3, w - len(foot) - 1)
-            stdscr.addstr(h - 1, fx, foot[: max(1, w - fx)], curses.color_pair(5))
-        except curses.error:
-            pass
+        put(stdscr, h - 1, 1, info, curses.color_pair(4))
+        fx = max(len(info) + 3, w - len(foot) - 1)
+        put(stdscr, h - 1, fx, foot[: max(1, w - fx)], curses.color_pair(5))
         stdscr.refresh()
 
         k = stdscr.getch()

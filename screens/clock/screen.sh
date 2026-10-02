@@ -14,6 +14,14 @@ CITY=""
     esac
 done <"$CONF"
 
+POINT=""
+if [[ "$LOC" =~ ^-?[0-9]+\.[0-9]+,-?[0-9]+\.[0-9]+$ ]]; then
+    POINT=$LOC
+fi
+
+san() { printf '%s' "$1" | tr -d '\000-\037\177\\'; }
+CITY=$(san "$CITY")
+
 FG="\033[38;5;244m"
 DIM="\033[2m"
 GRN="\033[1;32m"
@@ -66,14 +74,12 @@ weather() {
 
     local nowF desc hi lo tmhi tmlo tmdesc
     nowF=$(jq -r '.current_condition[0].temp_F' "$WFILE" 2>/dev/null)
-    desc=$(jq -r '.current_condition[0].weatherDesc[0].value' "$WFILE" 2>/dev/null | xargs)
-    desc=${desc//\\/}
+    desc=$(san "$(jq -r '.current_condition[0].weatherDesc[0].value' "$WFILE" 2>/dev/null | xargs)")
     hi=$(c2f "$(jq -r '.weather[0].maxtempC' "$WFILE")")
     lo=$(c2f "$(jq -r '.weather[0].mintempC' "$WFILE")")
     tmhi=$(c2f "$(jq -r '.weather[1].maxtempC' "$WFILE")")
     tmlo=$(c2f "$(jq -r '.weather[1].mintempC' "$WFILE")")
-    tmdesc=$(jq -r '.weather[1].hourly[4].weatherDesc[0].value // .weather[1].hourly[0].weatherDesc[0].value // "?"' "$WFILE" 2>/dev/null | xargs)
-    tmdesc=${tmdesc//\\/}
+    tmdesc=$(san "$(jq -r '.weather[1].hourly[4].weatherDesc[0].value // .weather[1].hourly[0].weatherDesc[0].value // "?"' "$WFILE" 2>/dev/null | xargs)")
 
     W_OUT=()
     W_PLAIN=()
@@ -86,18 +92,17 @@ weather() {
 
     ALERT_OUT=""
     ALERT_PLAIN=""
-    if [ ! -s "$AFILE" ] || [ $(( now - $(mtime "$AFILE") )) -gt 600 ]; then
+    if [ -n "$POINT" ] && { [ ! -s "$AFILE" ] || [ $(( now - $(mtime "$AFILE") )) -gt 600 ]; }; then
         curl -sf --max-time 12 -H "User-Agent: ambient-kiosk" \
-            "https://api.weather.gov/alerts/active?point=$LOC" -o "$AFILE.new" 2>/dev/null \
+            "https://api.weather.gov/alerts/active?point=$POINT" -o "$AFILE.new" 2>/dev/null \
             && mv "$AFILE.new" "$AFILE"
     fi
     if [ -s "$AFILE" ]; then
         local sev ev ends
         sev=$(jq -r '[.features[].properties.severity] | max_by(if . == "Extreme" then 4 elif . == "Severe" then 3 elif . == "Moderate" then 2 else 1 end) // empty' "$AFILE" 2>/dev/null)
-        ev=$(jq -r '[.features[].properties.event] | join(", ")' "$AFILE" 2>/dev/null)
-        ends=$(jq -r '.features[0].properties.ends // empty' "$AFILE" 2>/dev/null)
+        ev=$(san "$(jq -r '[.features[].properties.event] | join(", ")' "$AFILE" 2>/dev/null)")
+        ends=$(san "$(jq -r '.features[0].properties.ends // empty' "$AFILE" 2>/dev/null)")
         if [ -n "$ev" ]; then
-            ev=${ev//\\/}
             local col=$YEL
             [ "$sev" = Extreme ] || [ "$sev" = Severe ] && col=$RED
             local when=""
@@ -126,6 +131,7 @@ done
 while :; do
     C=$(tput cols) L=$(tput lines)
     T=$(date +%I:%M) D=$(date '+%A, %B %-d')
+    [ -n "$CITY" ] && D="$D · $CITY"
 
     if (( tick % 30 == 0 )); then
         if [ -n "$LOC" ]; then

@@ -32,14 +32,25 @@ mkdir -p "$CACHE"
 T=$(theme_now)
 printf 'color_theme = "%s"\n' "$T" >"$CACHE/btop.conf"
 
+sq() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
+RESTART="AMBIENT_CONFIG_DIR=$(sq "${AMBIENT_CONFIG_DIR:-}")"
+RESTART="$RESTART AMBIENT_DATA_DIR=$(sq "${AMBIENT_DATA_DIR:-}")"
+RESTART="$RESTART AMBIENT_CACHE_DIR=$(sq "${AMBIENT_CACHE_DIR:-}")"
+RESTART="$RESTART $(sq "$0")"
+
+WATCHER=""
 if [ -n "${TMUX_PANE:-}" ] && { command -v defaults >/dev/null 2>&1 || command -v gsettings >/dev/null 2>&1; }; then
     (
         while :; do
             sleep 10
             [ "$(theme_now)" != "$T" ] || continue
-            exec tmux respawn-window -k -t "$TMUX_PANE" "$0"
+            exec tmux respawn-window -k -t "$TMUX_PANE" "$RESTART"
         done
     ) &
+    WATCHER=$!
 fi
 
-exec btop -c "$CACHE/btop.conf"
+btop -c "$CACHE/btop.conf"
+RC=$?
+[ -n "$WATCHER" ] && kill "$WATCHER" 2>/dev/null
+exit $RC
