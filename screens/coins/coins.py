@@ -4,6 +4,7 @@ import glob
 import json
 import locale
 import os
+import re
 import threading
 import time
 import urllib.error
@@ -154,7 +155,7 @@ def portfolio_editor(stdscr, chosen):
     while True:
         now = time.time()
         rows = catalog_view(flt)
-        q = flt.strip().lower()
+        q = flt.strip()
         searching = False
         if len(q) >= 2:
             web = search_cache.get(q)
@@ -167,8 +168,14 @@ def portfolio_editor(stdscr, chosen):
                 extra = [c for c in web if c[0] not in seen]
                 if extra:
                     rows.append(("header", "coingecko"))
-                    for cid, sym, name, rank in extra[:20]:
-                        net = f"#{rank}" if rank else "—"
+                    for r in extra[:20]:
+                        cid, sym, name = r[0], r[1], r[2]
+                        if len(r) > 4 and r[4]:
+                            addr = r[5]
+                            short = f"{addr[:6]}…{addr[-4:]}" if len(addr) > 12 else addr
+                            net = f"{CHAIN_LABEL.get(r[4], r[4])[:6]:<6} {short}"
+                        else:
+                            net = f"#{r[3]}" if r[3] else "—"
                         rows.append(("coin", net, cid, sym, name))
                 else:
                     rows.append(("note", f'no coingecko matches for "{flt}"'))
@@ -236,7 +243,7 @@ def portfolio_editor(stdscr, chosen):
         elif k in (8, 127, curses.KEY_BACKSPACE):
             flt = flt[:-1]
         elif 32 <= k < 127:
-            flt += chr(k).lower()
+            flt += chr(k)
 
 EIGHTHS = " ▁▂▃▄▅▆▇█"
 SPINNER = "▁▃▅▇█▇▅▃"
@@ -245,6 +252,26 @@ RETRY_AT = {}
 LAST_NET = [0.0]
 MIN_CHART_GAP = 6
 SEARCH_SYM = {}
+FETCH_MISS = object()
+EVM_CHAINS = ["base", "ethereum", "arbitrum-one", "optimism", "polygon-pos", "binance-smart-chain", "avalanche"]
+CHAIN_LABEL = {
+    "ethereum": "eth",
+    "base": "base",
+    "arbitrum-one": "arb",
+    "optimism": "op",
+    "polygon-pos": "polygon",
+    "binance-smart-chain": "bnb",
+    "avalanche": "avax",
+    "solana": "sol",
+}
+
+
+def address_kind(q):
+    if re.fullmatch(r"(?:0[xX])?[0-9a-fA-F]{40}", q):
+        return "evm"
+    if re.fullmatch(r"[1-9A-HJ-NP-Za-km-z]{32,44}", q):
+        return "sol"
+    return None
 
 
 def put(stdscr, y, x, s, attr=0):
@@ -275,7 +302,7 @@ def logfail(msg):
         pass
 
 
-def fetch(url, cache, maxage, min_gap=0, timeout=10):
+def fetch(url, cache, maxage, min_gap=0, timeout=10, miss=False):
     try:
         if os.path.exists(cache) and time.time() - os.path.getmtime(cache) < maxage:
             with open(cache) as f:
@@ -297,6 +324,8 @@ def fetch(url, cache, maxage, min_gap=0, timeout=10):
             RETRY_AT.pop(url, None)
             return data
         except urllib.error.HTTPError as e:
+            if miss and e.code == 404:
+                return FETCH_MISS
             wait = 30 if e.code == 429 else 10
             try:
                 wait = min(max(wait, int(e.headers.get("Retry-After") or 0)), 3600)
@@ -315,14 +344,18 @@ def fetch(url, cache, maxage, min_gap=0, timeout=10):
 
 
 def web_results(q):
-    q = q.strip().lower()
+    q = q.strip()
     if len(q) < 2:
         return []
+    if address_kind(q):
+        return contract_lookup(q)
     url = "https://api.coingecko.com/api/v3/search?query=" + urllib.parse.quote(q)
     cache = os.path.join(CACHE_DIR, "screen-coins-search-" + urllib.parse.quote(q, safe="") + ".json")
-    data = fetch(url, cache, 86400, min_gap=1, timeout=5)
+    data = fetch(url, cache, 86400, min_gap=1, timeout=5, miss=True)
     if data is None:
         return None
+    if data is FETCH_MISS:
+        return []
     out = []
     for c in data.get("coins", []):
         cid = c.get("id")
@@ -332,6 +365,27 @@ def web_results(q):
         SEARCH_SYM[cid] = sym
         out.append((cid, sym, c.get("name") or cid, c.get("market_cap_rank")))
     return out
+
+
+def contract_lookup(q):
+    chains = EVM_CHAINS if address_kind(q) == "evm" else ["solana"]
+    addr = urllib.parse.quote(q)
+    for ch in chains:
+        url = f"https://api.coingecko.com/api/v3/coins/{ch}/contract/{addr}"
+        cache = os.path.join(CACHE_DIR, f"screen-coins-contract-{ch}-{addr}.json")
+        data = fetch(url, cache, 86400, min_gap=1, timeout=5, miss=True)
+        if data is None:
+            return None
+        if data is FETCH_MISS:
+            continue
+        cid = data.get("id")
+        if not cid:
+            continue
+        sym = (data.get("symbol") or cid).upper()
+        SEARCH_SYM[cid] = sym
+        plats = {k: v for k, v in (data.get("platforms") or {}).items() if v}
+        return [(cid, sym, data.get("name") or cid, None, ch, plats.get(ch, q))]
+    return []
 
 
 search_cache = {}
@@ -574,8 +628,8 @@ def draw(stdscr):
                 msg = f"rate-limited — chart retrying in {int(retry_at - time.time())}s"
             else:
                 msg = "loading chart…"
-            put(stdscr, y + ph // 2, 3, msg, curses.color_pair(4))
-            put(stdscr, y + ph // 2, 3 + len(msg) + 1, SPINNER[anim % len(SPINNER)], curses.color_pair(1) | curses.A_BOLD)
+            put(stdscr, y + ph // 2, 3, SPINNER[anim % len(SPINNER)], curses.color_pair(1) | curses.A_BOLD)
+            put(stdscr, y + ph // 2, 5, msg, curses.color_pair(4))
         else:
             marks = [0.0, 0.25, 0.5, 0.75, 1.0] if ph >= 20 else [0.0, 0.5, 1.0]
             for f in marks:

@@ -91,6 +91,31 @@ Faithful port of the kiosk's proven renderers: braille line grid
 `--json` emits rows + lo/hi/last_row for labeling. `glyphs = "ascii"` in
 config degrades braille/blocks to `#`.
 
+## TUI conventions
+
+Screens are plain scripts, so the shared look lives in convention rather
+than a framework. Anything user-facing follows these rules:
+
+- **Spinners lead their text.** `▃ searching coingecko…`, never
+  `loading chart… ▇`. One spinner glyph set everywhere (the bar wave
+  `▁▃▅▇█▇▅▃`, `SPINNER` in coins.py); frames advance on the input tick,
+  which drops to ~140ms while work is in flight.
+- **Busy work never freezes the UI.** Network calls run in a background
+  thread and the loop keeps reading keys; the spinner is the honest
+  state, not a decoration.
+- **Color semantics:** cyan = selection/brand, green/red = up/down,
+  dim gray (244) = meta, hints, and empty states. Notes state facts
+  (`no coingecko matches for "xyz"`) without blinking or drawing
+  attention.
+- **Ambiguous results identify themselves.** A coin found by contract
+  address shows its chain and a shortened address
+  (`base  0x7d9f…b1c2`); catalog/name matches show their market-cap
+  rank (`#373`).
+- **Addresses are pasted, not typed** — filters preserve case so
+  base58 and checksummed hex survive; contract lookups probe chains in
+  a fixed order (base, ethereum, then the other majors) and stop at the
+  first hit.
+
 ## Privacy charter
 
 - Zero telemetry, zero accounts. All caches under `~/.cache/ambient/` with a
