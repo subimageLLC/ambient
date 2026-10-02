@@ -18,7 +18,6 @@ import (
 )
 
 const Name = "ambient"
-const keyTable = "ambient"
 
 type Options struct {
 	Screens []screen.Screen
@@ -155,7 +154,6 @@ func Build(o Options) error {
 		{"set-option", "-t", Name, "status-right", "#[fg=#93a1a1,bold]? keys #[default]#[fg=#586e75]· #[default]#[fg=#93a1a1,bold]* setup #[default]#[fg=#586e75]· %H:%M %d-%b "},
 		{"set-option", "-t", Name, "-a", "update-environment", " COLORFGBG"},
 		{"set-option", "-t", Name, "detach-on-destroy", "off"},
-		{"set-option", "-t", Name, "key-table", keyTable},
 	}
 	for _, args := range styling {
 		if err := run(args, false); err != nil {
@@ -177,30 +175,28 @@ func Build(o Options) error {
 	return nil
 }
 
+// bindKeys wires ambient's keys without touching what other sessions see.
+// In tmux, key tables are server-global and the key-table option selects a
+// table consulted for BARE keypresses, so a custom table would hijack plain
+// letters from every pane app. Instead the default root/prefix tables stay
+// in place and only the keys ambient changes are bound, gated per-session:
+// inside ambient they run our command, elsewhere they fall back to the
+// stock binding. n/C-n/d/0-9 need no binds — the stock bindings already do
+// what ambient wants.
 func (o Options) bindKeys() error {
-	toggle := q(o.Exe) + " pause"
-	helpCmd := q(o.Exe) + " help --esc"
-	setupCmd := "AMBIENT_POPUP=1 " + q(o.Exe) + " setup-here"
-	binds := [][]string{
-		{"bind-key", "-T", keyTable, "d", "detach-client"},
-		{"bind-key", "-T", keyTable, "n", "next-window"},
-		{"bind-key", "-T", keyTable, "C-n", "next-window"},
-		{"bind-key", "-T", keyTable, "N", "previous-window"},
-		{"bind-key", "-T", keyTable, "C-N", "previous-window"},
-		{"bind-key", "-T", keyTable, "p", "run-shell", toggle, "\\;", "display-message", "rotation: toggled"},
-		{"bind-key", "-T", keyTable, "?", "display-popup", "-w", "64", "-h", "20", "-E", helpCmd},
-		{"bind-key", "-T", keyTable, "*", "display-popup", "-w", "80", "-h", "16", "-E", setupCmd},
-	}
-	for i := 0; i <= 9; i++ {
-		binds = append(binds, []string{"bind-key", "-T", keyTable, strconv.Itoa(i), "select-window", "-t", ":" + strconv.Itoa(i)})
-	}
 	gate := "#{==:#{session_name}," + Name + "}"
-	binds = append(binds,
-		[]string{"bind-key", "-n", "MouseDown1StatusRight", "if-shell", "-F", gate,
-			"display-popup -w 64 -h 20 -E " + q(helpCmd), ""},
-		[]string{"bind-key", "-n", "MouseDown3StatusRight", "if-shell", "-F", gate,
-			"display-popup -w 80 -h 16 -E " + q(setupCmd), ""},
-	)
+	pauseCmd := "run-shell " + q(q(o.Exe)+" pause")
+	helpCmd := "display-popup -w 64 -h 20 -E " + q(q(o.Exe)+" help --esc")
+	setupCmd := "display-popup -w 80 -h 16 -E AMBIENT_POPUP=1 " + q(q(o.Exe)+" setup-here")
+	binds := [][]string{
+		{"bind-key", "-T", "prefix", "N", "if-shell", "-F", gate, "previous-window", ""},
+		{"bind-key", "-T", "prefix", "C-N", "if-shell", "-F", gate, "previous-window", ""},
+		{"bind-key", "-T", "prefix", "p", "if-shell", "-F", gate, pauseCmd, "previous-window"},
+		{"bind-key", "-T", "prefix", "?", "if-shell", "-F", gate, helpCmd, "list-keys -N"},
+		{"bind-key", "-T", "prefix", "*", "if-shell", "-F", gate, setupCmd, ""},
+		{"bind-key", "-n", "MouseDown1StatusRight", "if-shell", "-F", gate, helpCmd, ""},
+		{"bind-key", "-n", "MouseDown3StatusRight", "if-shell", "-F", gate, setupCmd, ""},
+	}
 	for _, b := range binds {
 		if err := run(b, false); err != nil {
 			return err
