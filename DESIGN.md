@@ -107,10 +107,13 @@ than a framework. Anything user-facing follows these rules:
   dim gray (244) = meta, hints, and empty states. Notes state facts
   (`no coingecko matches for "xyz"`) without blinking or drawing
   attention.
-- **Ambiguous results identify themselves.** A coin found by contract
-  address shows its chain and a shortened address
-  (`base  0x7d9f…b1c2`); catalog/name matches show their market-cap
-  rank (`#373`).
+- **Ambiguous results identify themselves.** Search rows show the coin's
+  chain and a shortened contract (`eth  0x7d9f…b1c2`), from a
+  daily-cached platform index (`/coins/list?include_platform=true`,
+  compacted to id → {chain: address} on disk). Until the index lands —
+  or for native coins with no contract — the market-cap rank (`#373`)
+  stands in. Chain priority: base, eth, arb, op, polygon, bnb, avax,
+  sol.
 - **Addresses are pasted, not typed** — filters preserve case so
   base58 and checksummed hex survive; contract lookups probe chains in
   a fixed order (base, ethereum, then the other majors) and stop at the

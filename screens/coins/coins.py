@@ -364,7 +364,7 @@ def web_results(q):
         sym = (c.get("symbol") or cid).upper()
         SEARCH_SYM[cid] = sym
         out.append((cid, sym, c.get("name") or cid, c.get("market_cap_rank")))
-    return out
+    return plat_enrich(out)
 
 
 def contract_lookup(q):
@@ -390,6 +390,62 @@ def contract_lookup(q):
 
 search_cache = {}
 search_state = {"flight": None, "try": 0.0}
+plat_state = {"map": None, "building": False}
+PLAT_INDEX = os.path.join(CACHE_DIR, "screen-coins-platforms.json")
+PLATFORM_ORDER = EVM_CHAINS + ["solana"]
+
+
+def chain_for(cid, idx):
+    plats = idx.get(cid)
+    if not plats:
+        return None, None
+    for ch in PLATFORM_ORDER:
+        if plats.get(ch):
+            return ch, plats[ch]
+    return next(iter(plats.items()))
+
+
+def plat_enrich(rows):
+    idx = plat_state["map"]
+    if not idx:
+        if not plat_state["building"]:
+            plat_state["building"] = True
+            threading.Thread(target=_plat_worker, daemon=True).start()
+        return [r if len(r) > 4 else tuple(r) + (None, None) for r in rows]
+    out = []
+    for r in rows:
+        if len(r) > 4 and r[4]:
+            out.append(r)
+            continue
+        net, addr = chain_for(r[0], idx)
+        out.append((r[0], r[1], r[2], r[3], net, addr))
+    return out
+
+
+def _plat_worker():
+    url = "https://api.coingecko.com/api/v3/coins/list?include_platform=true"
+    try:
+        data = fetch(url, PLAT_INDEX, 86400, min_gap=1, timeout=30)
+        if isinstance(data, list):
+            idx = {}
+            for c in data:
+                plats = {k: v for k, v in (c.get("platforms") or {}).items() if v}
+                if plats:
+                    idx[c.get("id")] = plats
+            os.makedirs(CACHE_DIR, exist_ok=True)
+            tmp = PLAT_INDEX + ".tmp"
+            with open(tmp, "w") as f:
+                json.dump(idx, f)
+            os.replace(tmp, PLAT_INDEX)
+            plat_state["map"] = idx
+        elif isinstance(data, dict):
+            plat_state["map"] = data
+        if plat_state["map"]:
+            for q, rows in list(search_cache.items()):
+                if rows:
+                    search_cache[q] = plat_enrich(rows)
+    finally:
+        plat_state["building"] = False
 
 
 def search_dispatch(q):
