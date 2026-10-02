@@ -31,8 +31,9 @@ Screens rotate every 60s by default. Core options live in `~/.config/ambient/amb
 
 - `coins` — on first run, a picker opens right on the screen: browse popular
   coins grouped by network (majors, ethereum, base, solana, hyperliquid,
-  privacy), type to filter, space to pick. `a` reopens it anytime, `x` removes
-  the selected coin.
+  privacy), type to filter, space to pick. Typing two or more characters also
+  searches all of coingecko, so any listed coin can be added. `a` reopens it
+  anytime, `x` removes the selected coin.
 - `clock` — big block-digit clock and weather. Press `s` right on the screen
   to set a zipcode, city, or lat,lon (that query goes to wttr.in; nothing
   else about you does). `ambient setup clock` works from the terminal too.

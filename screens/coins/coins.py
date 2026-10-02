@@ -6,6 +6,7 @@ import locale
 import os
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 try:
@@ -129,12 +130,15 @@ def catalog_view(flt):
 
 def commit_selection(chosen):
     ids = []
-    for _, cid, _, _ in CATALOG:
+    for _, cid, sym, _ in CATALOG:
         if cid in chosen:
             ids.append((cid, CATALOG_SYM[cid]))
     for cid, sym in load_coins():
         if cid in chosen and all(cid != i for i, _ in ids):
             ids.append((cid, sym))
+    for cid in chosen:
+        if cid in SEARCH_SYM and all(cid != i for i, _ in ids):
+            ids.append((cid, SEARCH_SYM[cid]))
     if not ids:
         ids = DEFAULT_IDS
     save_coins(ids)
@@ -147,6 +151,14 @@ def portfolio_editor(stdscr, chosen):
     base = 0
     while True:
         rows = catalog_view(flt)
+        if len(flt.strip()) >= 2:
+            seen = {cid for _, cid, _, _ in CATALOG}
+            extra = [c for c in web_results(flt) if c[0] not in seen]
+            if extra:
+                rows.append(("header", "coingecko"))
+                for cid, sym, name, rank in extra[:20]:
+                    net = f"#{rank}" if rank else "—"
+                    rows.append(("coin", net, cid, sym, name))
         coin_idx = [i for i, r in enumerate(rows) if r[0] == "coin"]
         if coin_idx and cur >= len(coin_idx):
             cur = len(coin_idx) - 1
@@ -211,6 +223,7 @@ BRAILLE_BITS = [[1, 2, 4, 8], [16, 32, 64, 128]]
 RETRY_AT = {}
 LAST_NET = [0.0]
 MIN_CHART_GAP = 6
+SEARCH_SYM = {}
 
 
 def put(stdscr, y, x, s, attr=0):
@@ -241,7 +254,7 @@ def logfail(msg):
         pass
 
 
-def fetch(url, cache, maxage, min_gap=0):
+def fetch(url, cache, maxage, min_gap=0, timeout=10):
     try:
         if os.path.exists(cache) and time.time() - os.path.getmtime(cache) < maxage:
             with open(cache) as f:
@@ -255,7 +268,7 @@ def fetch(url, cache, maxage, min_gap=0):
         LAST_NET[0] = now
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "ambient-kiosk"})
-            with urllib.request.urlopen(req, timeout=10) as r:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
                 data = json.load(r)
             os.makedirs(CACHE_DIR, exist_ok=True)
             with open(cache, "w") as f:
@@ -278,6 +291,24 @@ def fetch(url, cache, maxage, min_gap=0):
             return json.load(f)
     except Exception:
         return None
+
+
+def web_results(q):
+    q = q.strip().lower()
+    if len(q) < 2:
+        return []
+    url = "https://api.coingecko.com/api/v3/search?query=" + urllib.parse.quote(q)
+    cache = os.path.join(CACHE_DIR, "screen-coins-search-" + urllib.parse.quote(q, safe="") + ".json")
+    data = fetch(url, cache, 86400, min_gap=1, timeout=5)
+    out = []
+    for c in (data or {}).get("coins", []):
+        cid = c.get("id")
+        if not cid:
+            continue
+        sym = (c.get("symbol") or cid).upper()
+        SEARCH_SYM[cid] = sym
+        out.append((cid, sym, c.get("name") or cid, c.get("market_cap_rank")))
+    return out
 
 
 def fmt(p):

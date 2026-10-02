@@ -7,7 +7,7 @@ reads    = ["~/.config/ambient/screens/coins.conf", "~/.cache/ambient/screen-coi
 contacts = ["api.coingecko.com"]
 keys     = [
   "↑/↓ or j,k   select coin",
-  "a            pick coins (add/remove from catalog)",
+  "a            pick coins — type to search all of coingecko, not just the catalog",
   "x            remove selected coin",
   "tab / d w m y  timeframe: day week month year",
   "r            force refresh",

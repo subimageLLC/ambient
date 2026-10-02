@@ -61,8 +61,10 @@ Users never edit config files by hand:
 
 - **coins** — first run opens an in-TUI portfolio picker: popular coins grouped
   by network (majors, ethereum, base, solana, hyperliquid, privacy), type to
-  filter, space to pick. `a` reopens the picker anytime, `x` removes the
-  selected coin. Saves to `~/.config/ambient/screens/coins.conf`.
+  filter, space to pick; typing 2+ characters also searches coingecko's full
+  catalog (cached), so any listed coin can be added. `a` reopens the picker
+  anytime, `x` removes the selected coin. Saves to
+  `~/.config/ambient/screens/coins.conf`.
 - **clock/weather** — `ambient setup clock` asks for a zipcode, city, or
   lat,lon, validates it against wttr.in, and saves it. The query string is the
   only thing about the user that leaves the machine.
