@@ -387,6 +387,10 @@ func cmdStart(rebuild bool) {
 			die(err)
 		}
 		fmt.Printf("ambient: session built with %d screens\n", len(screens))
+		if len(c.Screens) == 0 {
+			fmt.Println("ambient: no screens list set — rotating through all of them;")
+			fmt.Println("          pick your rotation in ~/.config/ambient/ambient.toml (screens = [...])")
+		}
 		if un := unconfigured(screens); len(un) > 0 {
 			fmt.Printf("ambient: not configured yet: %s — run `ambient setup %s` (or press s on the screen)\n",
 				strings.Join(un, ", "), un[0])

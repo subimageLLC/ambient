@@ -162,6 +162,12 @@ func SyncEmbedded(embedded embed.FS, dest string) error {
 	return nil
 }
 
+// DefaultOrder is the curated rotation for blank-slate configs (no
+// screens list): the glance screen leads, interactive data screens follow,
+// infrastructure trails. Anything not listed (private screens) appends
+// alphabetically.
+var DefaultOrder = []string{"now", "net", "sys", "coins", "docker", "events", "sec"}
+
 func Discover(configDir, dataDir string, enabled []string) ([]Screen, error) {
 	byName := map[string]Screen{}
 	var order []string
@@ -221,8 +227,14 @@ func Discover(configDir, dataDir string, enabled []string) ([]Screen, error) {
 		}
 		return out, nil
 	}
-	for _, n := range order {
-		out = append(out, byName[n])
+	seenOut := map[string]bool{}
+	for _, n := range append(append([]string{}, DefaultOrder...), order...) {
+		s, ok := byName[n]
+		if !ok || seenOut[n] {
+			continue
+		}
+		seenOut[n] = true
+		out = append(out, s)
 	}
 	return out, nil
 }

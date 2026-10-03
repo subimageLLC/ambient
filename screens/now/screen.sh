@@ -1,24 +1,32 @@
 #!/usr/bin/env bash
-# faithful port of the kiosk's screen-clock (toilet big time + wttr.in rows)
-# deltas from the kiosk: LOC/label from now.conf, caches under AMBIENT_CACHE_DIR,
-# portable stat, empty loc = clock without weather.
+# now — the glance screen: block-digit clock, date, wttr.in weather, NWS
+# alerts. Ported from the kiosk's screen-clock with two deliberate changes:
+#   - network never blocks the 1s tick (fetches are fire-and-forget)
+#   - `s` opens the location setup right on the screen (in a tmux popup)
+# LOC/label come from now.conf (clock.conf still read, pre-rename);
+# caches live under AMBIENT_CACHE_DIR.
 FONT="${FONT:-mono12}"
 CONF_DIR="${AMBIENT_CONFIG_DIR:-$HOME/.config/ambient}/screens"
-CONF="$CONF_DIR/now.conf"
-[ -f "$CONF" ] || CONF="$CONF_DIR/clock.conf"   # pre-rename configs still work
+HERE=$(cd "$(dirname "$0")" && pwd)
 LOC=""
 CITY=""
-[ -f "$CONF" ] && while IFS='=' read -r k v; do
-    case "$k" in
-        loc) LOC=$v ;;
-        label) CITY=$v ;;
-    esac
-done <"$CONF"
-
 POINT=""
-if [[ "$LOC" =~ ^-?[0-9]+\.[0-9]+,-?[0-9]+\.[0-9]+$ ]]; then
-    POINT=$LOC
-fi
+
+read_conf() {
+    local f="$CONF_DIR/now.conf"
+    [ -f "$f" ] || f="$CONF_DIR/clock.conf"   # pre-rename configs still work
+    LOC=""; CITY=""
+    [ -f "$f" ] && while IFS='=' read -r k v; do
+        case "$k" in
+            loc) LOC=$v ;;
+            label) CITY=$v ;;
+        esac
+    done <"$f"
+    if [[ "$LOC" =~ ^-?[0-9]+\.[0-9]+,-?[0-9]+\.[0-9]+$ ]]; then
+        POINT=$LOC
+    fi
+}
+read_conf
 
 san() { printf '%s' "$1" | tr -d '\000-\037\177\\'; }
 CITY=$(san "$CITY")
@@ -43,6 +51,7 @@ install_hint() {
     if command -v brew >/dev/null 2>&1; then echo "brew install$1"
     elif command -v apt-get >/dev/null 2>&1; then echo "sudo apt install$1"
     elif command -v dnf >/dev/null 2>&1; then echo "sudo dnf install$1"
+    elif command -v zypper >/dev/null 2>&1; then echo "sudo zypper install$1"
     elif command -v pacman >/dev/null 2>&1; then echo "sudo pacman -S$1"
     else echo "install$1 with your package manager"
     fi
@@ -63,16 +72,46 @@ c2f() {
     awk -v c="$1" 'BEGIN{printf "%d", c * 9 / 5 + 32}'
 }
 
-weather() {
+weather_fetch() {
+    # fire-and-forget: the clock never waits on curl. atomic mv keeps
+    # readers safe; a wedged .new (older than 30s) is retried.
     local now
     now=$(date +%s)
-    if [ ! -s "$WFILE" ] || [ $(( now - $(mtime "$WFILE") )) -gt 1800 ]; then
-        curl -sf --max-time 12 "https://wttr.in/$LOC?format=j1" -o "$WFILE.new" 2>/dev/null \
-            && mv "$WFILE.new" "$WFILE"
+    if [ -n "$LOC" ] && { [ ! -s "$WFILE" ] || [ $(( now - $(mtime "$WFILE") )) -gt 1800 ]; }; then
+        if [ ! -e "$WFILE.new" ] || [ $(( now - $(mtime "$WFILE.new") )) -gt 30 ]; then
+            rm -f "$WFILE.new"
+            ( curl -sf --max-time 12 "https://wttr.in/$LOC?format=j1" -o "$WFILE.new" 2>/dev/null \
+                && mv "$WFILE.new" "$WFILE" || rm -f "$WFILE.new" ) &
+        fi
     fi
-    [ -s "$WFILE" ] || return 1
+    if [ -n "$POINT" ] && { [ ! -s "$AFILE" ] || [ $(( now - $(mtime "$AFILE") )) -gt 600 ]; }; then
+        if [ ! -e "$AFILE.new" ] || [ $(( now - $(mtime "$AFILE.new") )) -gt 30 ]; then
+            rm -f "$AFILE.new"
+            ( curl -sf --max-time 12 -H "User-Agent: ambient-kiosk" \
+                "https://api.weather.gov/alerts/active?point=$POINT" -o "$AFILE.new" 2>/dev/null \
+                && mv "$AFILE.new" "$AFILE" || rm -f "$AFILE.new" ) &
+        fi
+    fi
+}
 
-    local nowF desc hi lo tmhi tmlo tmdesc
+weather() {
+    # render only — reads whatever cache exists and labels its state
+    W_OUT=(); W_PLAIN=(); ALERT_OUT=""; ALERT_PLAIN=""
+    if [ -z "$LOC" ]; then
+        W_OUT+=("$DIM press s — set location for weather$OFF")
+        W_PLAIN+=(" press s — set location for weather")
+        return 0
+    fi
+    if [ ! -s "$WFILE" ]; then
+        local msg="weather unavailable — will retry"
+        [ -e "$WFILE.new" ] && msg="▃ fetching weather…"
+        W_OUT+=("$DIM${msg}$OFF")
+        W_PLAIN+=(" ${msg}")
+        return 0
+    fi
+
+    local nowF desc hi lo tmhi tmlo tmdesc stale=""
+    [ $(( $(date +%s) - $(mtime "$WFILE") )) -gt 1800 ] && stale=" (stale)"
     nowF=$(jq -r '.current_condition[0].temp_F' "$WFILE" 2>/dev/null)
     desc=$(san "$(jq -r '.current_condition[0].weatherDesc[0].value' "$WFILE" 2>/dev/null | xargs)")
     hi=$(c2f "$(jq -r '.weather[0].maxtempC' "$WFILE")")
@@ -81,22 +120,13 @@ weather() {
     tmlo=$(c2f "$(jq -r '.weather[1].mintempC' "$WFILE")")
     tmdesc=$(san "$(jq -r '.weather[1].hourly[4].weatherDesc[0].value // .weather[1].hourly[0].weatherDesc[0].value // "?"' "$WFILE" 2>/dev/null | xargs)")
 
-    W_OUT=()
-    W_PLAIN=()
-    W_OUT+=("$DIM$(printf '%-10s' Now)$OFF\033[39m${nowF}°$OFF  $DIM${desc}$OFF")
+    W_OUT+=("$DIM$(printf '%-10s' Now)$OFF\033[39m${nowF}°$OFF  $DIM${desc}${stale}$OFF")
     W_PLAIN+=("$(printf '%-10s' Now)${nowF}°  $desc")
     W_OUT+=("$DIM$(printf '%-10s' Today)$OFF\033[33m▲ ${hi}°$OFF  \033[36m▼ ${lo}°$OFF")
     W_PLAIN+=("$(printf '%-10s' Today)▲ ${hi}°  ▼ ${lo}°")
     W_OUT+=("$DIM$(printf '%-10s' Tomorrow)$OFF\033[33m▲ ${tmhi}°$OFF  \033[36m▼ ${tmlo}°$OFF  $DIM${tmdesc}$OFF")
     W_PLAIN+=("$(printf '%-10s' Tomorrow)▲ ${tmhi}°  ▼ ${tmlo}°  $tmdesc")
 
-    ALERT_OUT=""
-    ALERT_PLAIN=""
-    if [ -n "$POINT" ] && { [ ! -s "$AFILE" ] || [ $(( now - $(mtime "$AFILE") )) -gt 600 ]; }; then
-        curl -sf --max-time 12 -H "User-Agent: ambient-kiosk" \
-            "https://api.weather.gov/alerts/active?point=$POINT" -o "$AFILE.new" 2>/dev/null \
-            && mv "$AFILE.new" "$AFILE"
-    fi
     if [ -s "$AFILE" ]; then
         local sev ev ends
         sev=$(jq -r '[.features[].properties.severity] | max_by(if . == "Extreme" then 4 elif . == "Severe" then 3 elif . == "Moderate" then 2 else 1 end) // empty' "$AFILE" 2>/dev/null)
@@ -112,6 +142,17 @@ weather() {
         fi
     fi
     return 0
+}
+
+run_setup() {
+    if [ -n "${TMUX:-}" ]; then
+        tmux display-popup -w 76 -h 16 -E "AMBIENT_CONFIG_DIR='$CONF_DIR' '$HERE/setup.sh'"
+    else
+        env AMBIENT_CONFIG_DIR="$CONF_DIR" "$HERE/setup.sh"
+    fi
+    read_conf          # pick up the new location immediately
+    weather_fetch
+    weather
 }
 
 tick=0
@@ -134,11 +175,8 @@ while :; do
     [ -n "$CITY" ] && D="$D · $CITY"
 
     if (( tick % 30 == 0 )); then
-        if [ -n "$LOC" ]; then
-            weather || { W_OUT=("$DIM weather unavailable$OFF"); W_PLAIN=(" weather unavailable"); ALERT_OUT=""; ALERT_PLAIN=""; }
-        else
-            W_OUT=("$DIM set location: ambient setup now$OFF"); W_PLAIN=(" set location: ambient setup now"); ALERT_OUT=""; ALERT_PLAIN=""
-        fi
+        weather_fetch
+        weather
     fi
 
     mapfile -t art < <(toilet -f "$FONT" "$T")
@@ -178,6 +216,9 @@ while :; do
     for ((i = 0; i < padb; i++)); do printf '\033[K'; (( i < padb - 1 )) && printf '\n'; done
 
     tick=$((tick + 1))
-    sleep 1 &
-    wait $!
+    # the 1s tick doubles as the key reader — `s` opens setup on-screen
+    IFS= read -rsn1 -t 1 k || true
+    case "$k" in
+        s|S) run_setup ;;
+    esac
 done

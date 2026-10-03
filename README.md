@@ -29,6 +29,11 @@ Screens rotate every 60s by default. Core options live in `~/.config/ambient/amb
 
 **Screens configure themselves — no config file editing required:**
 
+Blank-slate friendly: with no config at all, ambient rotates through every
+screen in a curated order (glance screen first) and tells you how to opt
+into the rest; every wait shows its state (fetching, rate-limited with a
+retry countdown, stale) — never a blank or frozen frame.
+
 - `coins` — on first run, a picker opens right on the screen: browse popular
   coins grouped by network (majors, ethereum, base, solana, hyperliquid,
   privacy), type to filter, space to pick. Typing two or more characters also

@@ -82,3 +82,30 @@ func TestLoadManifestPaneErrors(t *testing.T) {
 		}
 	}
 }
+
+func TestDiscoverDefaultOrderLeadsWithNow(t *testing.T) {
+	root := t.TempDir()
+	cfgDir := filepath.Join(root, "config")
+	dataDir := filepath.Join(root, "data")
+	for _, n := range []string{"coins", "now", "sys", "zz-private"} {
+		dir := filepath.Join(dataDir, "screens", n)
+		if n == "zz-private" {
+			dir = filepath.Join(cfgDir, "screens", n)
+		}
+		os.MkdirAll(dir, 0o755)
+		os.WriteFile(filepath.Join(dir, "manifest.toml"), []byte("name = \""+n+"\"\n"), 0o644)
+	}
+	screens, err := Discover(cfgDir, dataDir, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(screens) != 4 {
+		t.Fatalf("expected 4 screens, got %d", len(screens))
+	}
+	if screens[0].Name != "now" {
+		t.Fatalf("blank-slate config should open on now, got %s", screens[0].Name)
+	}
+	if screens[3].Name != "zz-private" {
+		t.Fatalf("unknown-to-DefaultOrder screens append at the end, got %s", screens[3].Name)
+	}
+}

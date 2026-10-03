@@ -6,6 +6,16 @@
 EXE="${AMBIENT_EXE:-ambient}"
 C="\033[1;36m"; D="\033[2m"; G="\033[1;32m"; Y="\033[1;33m"; R="\033[1;31m"; OFF="\033[0m"
 
+# RUNP: never let a wedged docker call freeze the pane — wrap in timeout
+# where the platform has one (linux yes; macOS usually not)
+RUNP() {
+    if command -v timeout >/dev/null 2>&1; then
+        timeout 15 "$@"
+    else
+        "$@"
+    fi
+}
+
 while :; do
     printf '\033[H'
     W=$(tput cols 2>/dev/null || echo 80)
@@ -89,11 +99,30 @@ while :; do
 
     if [ "$stats_rows" -gt 0 ]; then
         printf '\n'
-        $DC stats --no-stream --format '{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}' 2>/dev/null \
-            | head -"$stats_rows" \
-            | while IFS="	" read -r name cpu mem; do
-                printf '\033[2m  %-20.20s %6s  %s\033[0m\n' "$name" "$cpu" "$mem"
-            done
+        # one stats sample drives both the rows and the Σ; some daemons
+        # (the kiosk's, cgroup reporting) always answer 0B / 0B — if so, drop
+        # the memory column instead of printing a wall of zeros
+        stats=$(RUNP $DC stats --no-stream --format '{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}' 2>/dev/null)
+        if printf '%s' "$stats" | grep -qv '0B / 0B'; then
+            printf '%s' "$stats" | head -"$stats_rows" \
+                | while IFS="	" read -r name cpu mem; do
+                    printf '\033[2m  %-20.20s %6s  %s\033[0m\n' "$name" "$cpu" "$mem"
+                done
+        else
+            printf '%s' "$stats" | head -"$stats_rows" \
+                | while IFS="	" read -r name cpu _; do
+                    printf '\033[2m  %-20.20s cpu %6s\033[0m\n' "$name" "$cpu"
+                done
+        fi
+        sumcpu=$(printf '%s' "$stats" | awk -F'\t' '{ gsub("%", "", $2); s += $2 } END { printf "%.1f", s }')
+        printf '\033[2m  %-20s cpu %5s%%\033[0m\n' "Σ $(printf '%s' "$stats" | grep -c .)" "$sumcpu"
+        # disk usage, where the daemon (and the sudoers scope) allows it
+        df=$(RUNP $DC system df --format '{{.Type}}\t{{.Size}}' 2>/dev/null) && [ -n "$df" ] && {
+            dimg=$(printf '%s' "$df" | awk -F'\t' '$1 == "Images" {print $2}')
+            dcon=$(printf '%s' "$df" | awk -F'\t' '$1 == "Containers" {print $2}')
+            dvol=$(printf '%s' "$df" | awk -F'\t' '$1 == "Local Volumes" {print $2}')
+            printf '\033[2m  disk  images %s · containers %s · volumes %s\033[0m\n' "${dimg:-?}" "${dcon:-?}" "${dvol:-?}"
+        }
     fi
     printf '\033[2m %s containers · read-only view\033[0m\n' "${total:-0}"
     printf '\033[K\033[J'

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import curses
-import glob
 import json
 import locale
 import os
@@ -21,6 +20,24 @@ DEFAULT_IDS = [
     ("ethereum", "ETH"),
     ("solana", "SOL"),
 ]
+
+# ---- background data layer: the draw loop never touches the network ----
+# (DESIGN rule: busy work never freezes the UI. markets/chart fetches used
+# to run inline in draw(), so exiting the picker while coingecko was slow
+# or rate-limited froze the screen for seconds; and because save_coins used
+# to delete the markets cache, a 429 right after an add blanked every
+# number until the API recovered. Workers own the network; the loop reads
+# whatever is newest and labels staleness.)
+STATE = {"markets": None, "ids": None, "charts": {}, "want": (None, None)}
+FORCE = set()
+
+
+def markets_url(ids):
+    return (
+        "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids="
+        + ",".join(ids)
+        + "&price_change_percentage=24h,7d"
+    )
 CATALOG = [
     ("majors", "bitcoin", "BTC", "Bitcoin"),
     ("majors", "ethereum", "ETH", "Ethereum"),
@@ -82,13 +99,6 @@ CHART_CACHE = os.path.join(CACHE_DIR, "screen-coins-chart.json")
 LOG = os.path.join(CACHE_DIR, "screen-coins.log")
 
 
-def bust_markets():
-    try:
-        os.unlink(MARKETS_CACHE)
-    except OSError:
-        pass
-
-
 def load_coins():
     ids = []
     try:
@@ -113,7 +123,10 @@ def save_coins(ids):
         for cid, sym in ids:
             f.write(f"{cid} {sym}\n")
     os.replace(tmp, CONFIG)
-    bust_markets()
+    # NOTE: the markets cache is intentionally NOT busted here — a refetch
+    # is triggered by config-mtime staleness in the worker, so the old
+    # prices stay on screen (STALE) instead of going blank if coingecko
+    # answers 429 right after an add
 
 
 def catalog_view(flt):
@@ -569,8 +582,60 @@ def chart_url(coin_id, days):
     )
 
 
-def chart_data(coin_id, days):
-    return fetch(chart_url(coin_id, days), CHART_CACHE + f".{coin_id}.{days}", 300, min_gap=MIN_CHART_GAP)
+def _markets_worker():
+    # refetch triggers: no data yet, the coin list changed, the cache aged
+    # out (55s), or the config is newer than the cache (a coin was just
+    # added) — the last one is why maxage drops to 0: fetch's own mtime
+    # check can't know the content is incomplete without the new coin
+    while True:
+        try:
+            ids = [cid for cid, _ in load_coins()]
+            url = markets_url(ids)
+            fresh = (
+                os.path.exists(MARKETS_CACHE)
+                and time.time() - os.path.getmtime(MARKETS_CACHE) < 55
+                and os.path.getmtime(MARKETS_CACHE) > os.path.getmtime(CONFIG)
+            )
+            if url in FORCE:
+                FORCE.discard(url)
+                RETRY_AT.pop(url, None)
+                fresh = False
+            if STATE["markets"] is None or ids != STATE["ids"] or not fresh:
+                data = fetch(url, MARKETS_CACHE, 55 if fresh else 0, min_gap=1)
+                if data:
+                    STATE["markets"] = data
+                    STATE["ids"] = ids
+        except Exception:
+            pass
+        time.sleep(1)
+
+
+def _chart_worker():
+    # fetches whatever (coin, days) the draw loop is currently showing;
+    # fetch's min_gap throttles chart vs markets network calls globally
+    while True:
+        try:
+            coin_id, days = STATE["want"]
+            if coin_id:
+                key = (coin_id, days)
+                cache = CHART_CACHE + f".{coin_id}.{days}"
+                fresh = (
+                    key in STATE["charts"]
+                    and os.path.exists(cache)
+                    and time.time() - os.path.getmtime(cache) < 300
+                )
+                url = chart_url(coin_id, days)
+                if url in FORCE:
+                    FORCE.discard(url)
+                    RETRY_AT.pop(url, None)
+                    fresh = False
+                if not fresh:
+                    data = fetch(url, cache, 300, min_gap=MIN_CHART_GAP)
+                    if data:
+                        STATE["charts"][key] = data
+        except Exception:
+            pass
+        time.sleep(1)
 
 
 def wait_stable_size(stdscr):
@@ -610,8 +675,11 @@ def draw(stdscr):
     sel = 0
     tfs = [("D", 1), ("W", 7), ("M", 30), ("Y", 365)]
     tfi = 0
-    fetched = 0
     anim = 0
+    by_id = {}  # persists across frames: mcap ordering uses last good data
+
+    threading.Thread(target=_markets_worker, daemon=True).start()
+    threading.Thread(target=_chart_worker, daemon=True).start()
 
     if not os.path.exists(CONFIG):
         chosen = portfolio_editor(stdscr, {"bitcoin", "ethereum", "solana"})
@@ -620,15 +688,23 @@ def draw(stdscr):
         commit_selection(chosen)
 
     while True:
+        # order the ticker by market cap (top to bottom); unknown mcap
+        # sinks to the bottom, keeping config order (stable sort), and the
+        # selection follows its coin across any reorder
         IDS = load_coins()
-        if sel >= len(IDS):
-            sel = 0
+        prev_cid = IDS[sel][0] if sel < len(IDS) else None
+        if by_id:
+            IDS = sorted(
+                IDS,
+                key=lambda e: -((by_id.get(e[0]) or {}).get("market_cap") or 0),
+            )
+        sel = 0
+        if prev_cid:
+            for i, (cid, _) in enumerate(IDS):
+                if cid == prev_cid:
+                    sel = i
+                    break
         anim += 1
-        api_markets = (
-            "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids="
-            + ",".join(i for i, _ in IDS)
-            + "&price_change_percentage=24h,7d"
-        )
         h, w = stdscr.getmaxyx()
         if w < 52 or h < 12:
             stdscr.erase()
@@ -636,13 +712,15 @@ def draw(stdscr):
             stdscr.refresh()
             stdscr.getch()
             continue
-        markets = fetch(api_markets, MARKETS_CACHE, 55)
-        if markets:
-            fetched = max(fetched, os.path.getmtime(MARKETS_CACHE))
+        markets = STATE["markets"]
         by_id = {c.get("id"): c for c in (markets or [])}
+        murl = markets_url([cid for cid, _ in IDS])
+        mretry = RETRY_AT.get(murl, 0)
 
         coin_id, sym = IDS[sel]
-        cd = chart_data(coin_id, tfs[tfi][1])
+        days = tfs[tfi][1]
+        STATE["want"] = (coin_id, days)
+        cd = STATE["charts"].get((coin_id, days))
         prices = [p[1] for p in (cd or {}).get("prices", [])]
         pts = [p[0] for p in (cd or {}).get("prices", [])]
         vols = [v[1] for v in (cd or {}).get("total_volumes", [])]
@@ -664,6 +742,14 @@ def draw(stdscr):
             pair = curses.color_pair(2 if d > 0 else 3) | curses.A_BOLD
             put(stdscr, 0, 6, f" ${fmt(c.get('current_price'))}", curses.color_pair(5) | curses.A_BOLD)
             put(stdscr, 0, 6 + 12, f" {arrow} {s} 24h", pair)
+        elif markets:
+            put(stdscr, 0, 6, f" {SPINNER[anim % len(SPINNER)]} loading price…", curses.color_pair(4))
+        else:
+            if mretry > time.time():
+                note = f"coingecko limited — retrying in {int(mretry - time.time())}s"
+            else:
+                note = f"{SPINNER[anim % len(SPINNER)]} loading prices…"
+            put(stdscr, 0, 6, f" {note}", curses.color_pair(4))
         for i, (lab, _) in enumerate(tfs):
             attr = curses.A_REVERSE if i == tfi else curses.color_pair(4)
             x = w - 4 - (len(tfs) - i) * 3
@@ -735,6 +821,14 @@ def draw(stdscr):
                     mc = c.get("market_cap")
                     if mc is not None:
                         put(stdscr, y + i, 52, f"${compact(mc)}", curses.color_pair(4))
+            else:
+                # coin the markets payload has not caught up with yet —
+                # say which wait this is; never a blank row
+                if mretry > time.time():
+                    txt = f"waiting — coingecko limited, retry in {int(mretry - time.time())}s"
+                else:
+                    txt = f"{SPINNER[anim % len(SPINNER)]} fetching…"
+                put(stdscr, y + i, 9, txt, curses.color_pair(4))
 
         age = int(time.time() - os.path.getmtime(MARKETS_CACHE)) if os.path.exists(MARKETS_CACHE) else 9999
         stale = " STALE" if age > 300 else ""
@@ -775,15 +869,11 @@ def draw(stdscr):
         elif k in (ord("y"), ord("Y")):
             tfi = 3
         elif k in (ord("r"), ord("R")):
-            try:
-                os.unlink(MARKETS_CACHE)
-            except FileNotFoundError:
-                pass
-            for f in glob.glob(CHART_CACHE + ".*"):
-                try:
-                    os.unlink(f)
-                except OSError:
-                    pass
+            # force one refetch of what is on screen; caches stay on disk
+            # so a 429 during refresh still shows stale data, never blanks
+            FORCE.add(markets_url([cid for cid, _ in load_coins()]))
+            if IDS and sel < len(IDS):
+                FORCE.add(chart_url(IDS[sel][0], tfs[tfi][1]))
 
 
 def main():
