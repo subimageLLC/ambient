@@ -28,6 +28,20 @@ human() {
     }'
 }
 
+# durfmt: minutes -> "45m" / "7h" / "3d" — a 24h event window needs more
+# than raw minutes ("recovered in 1439m" reads as noise)
+durfmt() {
+    m=$1
+    [ "$m" -lt 0 ] && m=0   # clock-skew/parsing guard; never show negative time
+    if [ "$m" -lt 60 ]; then
+        printf '%dm' "$m"
+    elif [ "$m" -lt 2880 ]; then
+        printf '%dh' $(( m / 60 ))
+    else
+        printf '%dd' $(( m / 1440 ))
+    fi
+}
+
 if command -v journalctl >/dev/null 2>&1; then
     BACKEND=journal
 elif [ "$(uname -s 2>/dev/null)" = "Darwin" ] && command -v log >/dev/null 2>&1; then
@@ -43,14 +57,19 @@ ssh_unit() {
     return 1
 }
 
-# systemd unit events from the last 2h: fail/restart per unit, first+last seen.
+# systemd unit events from the last 24h: fail/restart per unit, first+last seen.
 # No _PID=1/_COMM=systemd field match here — some journalds (the kiosk's volatile
 # journal, pre-reboot config change) skip trusted fields for pid-1's own
 # messages; the awk prefix match on the "systemd[1]:" tag is the portable bit.
 unit_events() {
-    journalctl --since "-2 hours" --no-pager -o short 2>/dev/null | awk -v mf="$MUTE" "$MUTE_AWK"'
+    journalctl --since "-24 hours" --no-pager -o short 2>/dev/null | awk -v mf="$MUTE" "$MUTE_AWK"'
         {
             line = $0
+            # stamp = "Oct 02 17:03" — full date, not bare time: a 24h
+            # window crosses midnight, and a bare HH:MM would resolve to
+            # TODAY when computing durations (negative minutes for events
+            # from the day before)
+            stamp = $1 " " $2 " " substr($3, 1, 5)
             if (!sub(/^.*systemd\[[0-9]+\]: /, "", line)) next
             unit = line
             if (!sub(/: .*/, "", unit)) next
@@ -61,15 +80,15 @@ unit_events() {
                 why = msg
                 sub(/^Failed with result ./, "", why)
                 sub("\047\\.$", "", why)
-                if (!(unit in first) || $3 < first[unit]) first[unit] = $3
-                last[unit] = $3
+                if (!(unit in first) || stamp < first[unit]) first[unit] = stamp
+                last[unit] = stamp
                 reason[unit] = why
                 fail[unit] = 1
             } else if (msg ~ /restart counter is at/) {
                 match($0, /restart counter is at [0-9]+/)
                 n = substr($0, RSTART + 22, RLENGTH - 22) + 0
                 if (n > rst[unit]) rst[unit] = n
-                last[unit] = $3
+                last[unit] = stamp
             }
         }
         END {
@@ -83,21 +102,21 @@ unit_events() {
         }'
 }
 
-# kernel events: OOM kills and disk I/O errors, per target
+# kernel events from the last 24h: OOM kills and disk I/O errors, per target
 kernel_events() {
-    journalctl -k --since "-2 hours" --no-pager -o short 2>/dev/null | awk -v mf="$MUTE" "$MUTE_AWK"'
+    journalctl -k --since "-24 hours" --no-pager -o short 2>/dev/null | awk -v mf="$MUTE" "$MUTE_AWK"'
         /Out of memory: Killed process/ {
             p = $0
             sub(/^.*Killed process [0-9]+ \(/, "", p)
             sub(/\).*$/, "", p)
             if (("kernel:" p) in mute) next
-            oomn[p]++; oomt[p] = substr($3, 1, 5)
+            oomn[p]++; oomt[p] = $1 " " $2 " " substr($3, 1, 5)
         }
         /I\/O error, dev / {
             match($0, /dev [a-z]+[0-9]*/)
             d = substr($0, RSTART + 4, RLENGTH - 4)
             if (("kernel:" d) in mute) next
-            ion[d]++; iot[d] = substr($3, 1, 5)
+            ion[d]++; iot[d] = $1 " " $2 " " substr($3, 1, 5)
         }
         END {
             for (p in oomn) print "oom\t" oomt[p] "\t" oomt[p] "\t" p "\tOOM\t" oomn[p]
@@ -105,10 +124,12 @@ kernel_events() {
         }'
 }
 
-# ssh brute-force: top attacker in the last hour, if persistent
+# ssh brute-force: top attacker in the last HOUR only — this rule is an
+# "is happening now" signal; a 24h count would page forever after one
+# bad hour on an internet-facing box
 ssh_events() {
     unit=$1
-    now=$(date +%H:%M)
+    now=$(date '+%b %d %H:%M')
     journalctl -u "$unit" --since "-1 hours" --no-pager -o short 2>/dev/null \
         | grep -oE 'Failed [^ ]+ .+ from ([0-9]+\.){3}[0-9]+' \
         | grep -oE '([0-9]+\.){3}[0-9]+' \
@@ -165,16 +186,20 @@ while :; do
             res=$(systemctl show "$unit" -p Result --value 2>/dev/null)
             load=$(systemctl show "$unit" -p LoadState --value 2>/dev/null)
             mins=$(( ($(date +%s) - $(date -d "$first" +%s 2>/dev/null || date +%s)) / 60 ))
+            dur=$(durfmt "$mins")
             loop=""
             [ "${rst:-0}" -ge 3 ] && loop=", restarted ${rst}×"
+            # display name drops the .service suffix — em-dashes already
+            # eat the byte budget without it
+            un=${unit%.service}
             if [ "$load" = "not-found" ]; then
-                printf '3\t%s\tfix\t%s\tfailed (%s)%s — unit gone\n' "$last" "$unit" "$why" "$loop"
+                printf '3\t%s\tfix\t%s\tfailed (%s)%s — unit gone\n' "$last" "$un" "$why" "$loop"
             elif [ "$kind" = loop ] || { [ "$res" != "failed" ] && [ "${rst:-0}" -ge 3 ]; }; then
-                printf '2\t%s\tloop\t%s\tcrash-looping, %s restarts\n' "$last" "$unit" "${rst:-?}"
+                printf '2\t%s\tloop\t%s\tcrash-looping, %s restarts\n' "$last" "$un" "${rst:-?}"
             elif [ "$res" = "failed" ]; then
-                printf '1\t%s\tdown\t%s\tfailed (%s)%s — down %dm\n' "$last" "$unit" "$why" "$loop" "$mins"
+                printf '1\t%s\tdown\t%s\tfailed (%s)%s — down %s\n' "$last" "$un" "$why" "$loop" "$dur"
             else
-                printf '3\t%s\tfix\t%s\tfailed (%s)%s — recovered in %dm\n' "$last" "$unit" "$why" "$loop" "$mins"
+                printf '3\t%s\tfix\t%s\tfailed (%s)%s — recovered in %s\n' "$last" "$un" "$why" "$loop" "$dur"
             fi
         done <<EOF2
 $(unit_events)
@@ -222,15 +247,15 @@ EOF
 
     printf '%b%s%b' "$C" "$LH" "$OFF"
     if [ "${nopen:-0}" -gt 0 ]; then
-        printf '%b%s open · %s fixed · 2h window%b' "$R" "$nopen" "$nfix" "$OFF"
+        printf '%b%s open · %s fixed · 24h window%b' "$R" "$nopen" "$nfix" "$OFF"
     elif [ "${nfix:-0}" -gt 0 ]; then
-        printf '%b%s fixed · all quiet · 2h window%b' "$G" "$nfix" "$OFF"
+        printf '%b%s fixed · all quiet · 24h window%b' "$G" "$nfix" "$OFF"
     elif [ "$BACKEND" = unified ]; then
         printf '%bmacOS hum only — event rules need a linux journal%b' "$D" "$OFF"
     elif [ -z "$BACKEND" ]; then
         printf '%bn/a — needs a systemd journal (most linux) or macOS log(1); openrc/musl hosts have neither%b' "$D" "$OFF"
     else
-        printf '%ball quiet · 2h window%b' "$G" "$OFF"
+        printf '%ball quiet · 24h window%b' "$G" "$OFF"
     fi
     printf '\033[K\n'
 
@@ -246,9 +271,9 @@ EOF
                 fix)  mark="✓ fix "; g="$G" ;;
                 *)    mark="↻ loop"; g="$Y" ;;
             esac
-            # prefix " HH:MM  " + %-7s mark + space ≈ 20 cols; text gets the rest
+            # prefix " Oct 02 17:03  " + %-7s mark + space ≈ 24 cols
             printf ' %b%s%b  %b%-7s%b %b%s%b\n' \
-                "$D" "$tm" "$OFF" "$g" "$mark" "$OFF" "$g" "$(printf '%.*s' $((W - 20)) "$kind — $text")" "$OFF"
+                "$D" "$tm" "$OFF" "$g" "$mark" "$OFF" "$g" "$(printf '%.*s' $((W - 24)) "$kind — $text")" "$OFF"
         done
         if [ "$total" -gt "$maxrows" ]; then
             printf ' %b… +%d more\033[K\n' "$D" "$((total - maxrows))"

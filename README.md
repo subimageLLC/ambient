@@ -127,7 +127,7 @@ ambient display was noise theater, so the screen mines the journal with
 small local rules (no agent, no cloud) into plain-language events — *what
 happened, when, and whether it is still broken*:
 
-    EVENTS   1 open · 1 fixed · 2h window
+    EVENTS   1 open · 1 fixed · 24h window
      16:04  ⚠ live   203.0.113.45 — ssh: 87 failed logins (1h)
      15:37  ✓ fix    backup-timer — failed (exec), recovered after 37m
      hum    kernel:edt_ft5x06 ×6.4k · muted sources stay counted
