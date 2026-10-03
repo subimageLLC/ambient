@@ -107,7 +107,7 @@ kernel_events() {
 
 # ssh brute-force: top attacker in the last hour, if persistent
 ssh_events() {
-    local unit=$1 now
+    unit=$1
     now=$(date +%H:%M)
     journalctl -u "$unit" --since "-1 hours" --no-pager -o short 2>/dev/null \
         | grep -oE 'Failed [^ ]+ .+ from ([0-9]+\.){3}[0-9]+' \
@@ -180,7 +180,7 @@ while :; do
 $(unit_events)
 EOF2
         # kernel: OOM kills, disk I/O errors
-        while IFS="$(printf '\t')" read -r kind tlast tfirst target what cnt; do
+        while IFS="$(printf '\t')" read -r kind tlast _ target _ cnt; do
             [ -z "${target:-}" ] && continue
             if [ "$kind" = oom ]; then
                 printf '1\t%s\tlive\t%s\tOOM killed, ×%s\n' "$tlast" "$target" "$cnt"
@@ -238,7 +238,7 @@ EOF
     [ "$maxrows" -lt 1 ] && maxrows=1
     if [ "$total" -gt 0 ]; then
         printf '%s\n' "$ev" | sort -t"$(printf '\t')" -k1,1n -k2,2r | head -"$maxrows" \
-        | while IFS="$(printf '\t')" read -r sev tm state kind text; do
+        | while IFS="$(printf '\t')" read -r _ tm state kind text; do
             [ -z "${text:-}" ] && continue
             case "$state" in
                 down) mark="× down"; g="$R" ;;

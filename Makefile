@@ -1,4 +1,4 @@
-.PHONY: build test lint fmt install clean
+.PHONY: build test lint fmt install smoke check clean
 
 VERSION ?= $(shell git describe --tags --always 2>/dev/null || echo dev)
 
@@ -11,6 +11,12 @@ test:
 lint:
 	go vet ./...
 	gofmt -l . | grep -q . && { echo "files need gofmt:"; gofmt -l .; exit 1; } || true
+	./tests/lint-scripts.sh
+
+smoke: build
+	./tests/smoke.sh
+
+check: lint test smoke
 
 fmt:
 	gofmt -w .

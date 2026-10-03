@@ -1,4 +1,5 @@
 #!/bin/sh
+# shellcheck disable=SC2093  # exec is the point: this screen becomes the monitor
 # btop with a theme that follows the desktop appearance.
 # btop must stay foreground (it refuses background), so a watcher
 # respawns this window when the appearance flips.

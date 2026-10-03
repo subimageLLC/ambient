@@ -1,6 +1,6 @@
 # TODO
 
-## packaging
+## packaging (next milestone: v0.2.0)
 - [ ] goreleaser nfpm: `.deb` with `Depends: tmux, toilet, jq, gping` and `.rpm` with `Requires` — so a dpkg/dnf install pulls screen deps
 - [ ] homebrew tap (goreleaser generates the formula; brew pulls toilet/jq/gping/btop automatically)
 - [ ] AUR package
@@ -8,15 +8,15 @@
 - [ ] tag v0.2.0, cut the first release with binaries
 
 ## screens
-- [x] core: pane splits per screen (`[[panes]]` in manifest) — done, ported the kiosk's layouts
-- [x] core: status chips (ambient chip/status + ticker render) — done
-- [x] the kiosk migration screens: docker (read-only), logs (logsum+lnav), sec (generic core + optional unifi), net tailnet pane — done
-- [x] the kiosk cutover — done 2026-10-02: Go binary at /usr/local/bin/ambient, private screens (lan, sec+unifi) in ~<service-user>/.config/ambient/screens/, launcher shim with old builder kept at ~/bin/ambient.bash.bak, runbook at the kiosk:the cutover runbook
 - [ ] sys theme detection: KDE (kreadconfig kdeglobals ColorScheme) and hyprland/sway equivalents; OSC 11 terminal-background query for terminal-theme ≠ OS-theme cases (unreliable through tmux)
-- [ ] coins: check axis labels fit the pi's 88x25 pane (may need fewer ticks at small widths)
-- [ ] coins: migrate to `ambient fetch` / `ambient chart` subcommands — one implementation of backoff + braille rendering instead of the vendored copy
+- [x] coins: axis labels fit the pi's 88x25 pane — verified live on the kiosk 2026-10-02
+- [ ] coins: migrate to `ambient fetch` / `ambient chart` subcommands — one implementation of backoff + braille rendering instead of the vendored copy (deferred deliberately: too risky to rework the most-polished screen unattended)
 
-## core
-- [ ] doctor: non-zero exit when deps are missing (CI-friendly)
-- [ ] test attach from two terminals simultaneously (mirror mode)
-- [ ] systemd user timer alternative to the internal ticker, documented
+## done (2026-10-02, the kiosk cutover)
+- [x] pane splits per screen (`[[panes]]` in manifest) — the kiosk's layouts port
+- [x] status chips (`ambient chip`/`status`, ticker render, stale dim, dead drop)
+- [x] the kiosk parity screens: docker (read-only), events (replaced logs), sec, net tailnet pane
+- [x] the kiosk cutover: Go binary at /usr/local/bin/ambient, private screens (lan, sec+unifi) in ~<service-user>/.config/ambient/screens/, shim with old builder kept at ~/bin/ambient.bash.bak, runbook at the kiosk:the cutover runbook
+- [x] clock → now rename (now.conf with clock.conf fallback)
+- [x] doctor: distro detection (suse + red hat families, correct apk/zypper verbs), journal-readability probe, non-zero exit when enabled screens' needs are missing
+- [x] CI: `make check` = vet + gofmt + shellcheck + script syntax + go tests + headless smoke against the real screens, on ubuntu and macOS

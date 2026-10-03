@@ -96,10 +96,17 @@ func probe(url string) string {
 	return "reachable"
 }
 
-func Run(c cfg.Config, screens []screen.Screen) {
+// Run prints the environment report and returns the number of unsatisfied
+// needs across enabled screens — non-zero is CI-meaningful (missing deps),
+// while advisory notes (journal readability) never count.
+func Run(c cfg.Config, screens []screen.Screen) int {
+	missing := 0
 	fmt.Println("ambient doctor")
 	fmt.Println()
 	fmt.Printf("tmux        %s\n", check("tmux"))
+	if check("tmux") == "missing" {
+		missing++
+	}
 	for _, s := range screens {
 		for _, need := range s.Needs {
 			if need == "network" {
@@ -114,6 +121,9 @@ func Run(c cfg.Config, screens []screen.Screen) {
 					status = "ok"
 					break
 				}
+			}
+			if status == "missing" {
+				missing++
 			}
 			line := fmt.Sprintf("%-11s %-7s (for %s)", need, status, s.Name)
 			if status == "missing" {
@@ -178,6 +188,7 @@ func Run(c cfg.Config, screens []screen.Screen) {
 	} else {
 		fmt.Println("if any row shows tofu, install a nerd font or set glyphs = \"ascii\".")
 	}
+	return missing
 }
 
 func pri(p bool) string {

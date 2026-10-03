@@ -25,10 +25,8 @@ CITY=$(san "$CITY")
 
 FG="\033[38;5;244m"
 DIM="\033[2m"
-GRN="\033[1;32m"
 RED="\033[1;31m"
 YEL="\033[1;33m"
-CYN="\033[36m"
 WHT="\033[1;39m"
 OFF="\033[0m"
 WFILE="${AMBIENT_CACHE_DIR:-$HOME/.cache/ambient}/weather.json"
@@ -66,7 +64,8 @@ c2f() {
 }
 
 weather() {
-    local now=$(date +%s)
+    local now
+    now=$(date +%s)
     if [ ! -s "$WFILE" ] || [ $(( now - $(mtime "$WFILE") )) -gt 1800 ]; then
         curl -sf --max-time 12 "https://wttr.in/$LOC?format=j1" -o "$WFILE.new" 2>/dev/null \
             && mv "$WFILE.new" "$WFILE"

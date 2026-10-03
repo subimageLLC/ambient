@@ -5,7 +5,7 @@ on:
   pull_request:
 
 jobs:
-  test:
+  check:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
@@ -15,24 +15,12 @@ jobs:
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version-file: go.mod
-      - run: go vet ./...
-      - run: go test ./...
-      - run: go build -o bin/ambient .
-      - name: install tmux if missing
+      - name: install test deps (tmux, shellcheck)
         run: |
-          command -v tmux && exit 0
           if [ "$(uname)" = "Linux" ]; then
-            sudo apt-get update && sudo apt-get install -y tmux
+            sudo apt-get update && sudo apt-get install -y tmux shellcheck
           else
-            brew install tmux
+            brew install tmux shellcheck
           fi
-          command -v tmux
-      - name: smoke test (headless session)
-        run: |
-          export AMBIENT_CONFIG_DIR=$PWD/.smoke-config AMBIENT_DATA_DIR=$PWD/.smoke-data AMBIENT_CACHE_DIR=$PWD/.smoke-cache
-          mkdir -p $AMBIENT_CONFIG_DIR
-          printf 'screens = ["clock"]\nrotation_secs = 5\n' > $AMBIENT_CONFIG_DIR/ambient.toml
-          ./bin/ambient start -d --no-rotate
-          sleep 3
-          tmux capture-pane -t ambient:clock -p | grep -q "$(date +%a)" && echo "clock pane rendered"
-          tmux kill-session -t ambient
+      - name: lint, test, smoke (headless session against the real screens)
+        run: make check

@@ -92,7 +92,8 @@ func main() {
 			die(fmt.Errorf("config: %w", err))
 		}
 		screens := loadScreens(c)
-		doctor.Run(c, screens)
+		// non-zero when enabled screens have unsatisfied needs (CI-friendly)
+		os.Exit(doctor.Run(c, screens))
 	case "chip":
 		cmdChip(os.Args[2:])
 	case "status":
