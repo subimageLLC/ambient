@@ -20,6 +20,7 @@ import (
 	"ambient/internal/run"
 	"ambient/internal/screen"
 	"ambient/internal/session"
+	"ambient/internal/status"
 )
 
 //go:embed screens
@@ -64,7 +65,14 @@ func main() {
 				secs = n
 			}
 		}
-		if err := run.Ticker(secs, func() error { return session.Rotate(false) }, session.Has); err != nil {
+		tick := func() error {
+			err := session.Rotate(false)
+			if rerr := session.RenderStatus(); rerr != nil {
+				fmt.Fprintln(os.Stderr, "status:", rerr)
+			}
+			return err
+		}
+		if err := run.Ticker(secs, tick, session.Has); err != nil {
 			die(err)
 		}
 	case "run":
@@ -85,6 +93,13 @@ func main() {
 		}
 		screens := loadScreens(c)
 		doctor.Run(c, screens)
+	case "chip":
+		cmdChip(os.Args[2:])
+	case "status":
+		if err := session.RenderStatus(); err != nil {
+			die(err)
+		}
+		fmt.Println(status.Render(status.Read(), time.Now()))
 	case "screens":
 		c, err := cfg.Load()
 		if err != nil {
@@ -120,6 +135,8 @@ usage:
   ambient rotate [--force]            advance to the next screen
   ambient pause                       toggle rotation pause
   ambient screens                     list available screens
+  ambient chip <n> clear|<c> <p> <t>  set status-bar chips for a screen
+  ambient status                      render status-bar chips now
   ambient setup <screen>              configure a screen (weather, net, ...)
   ambient doctor                      check environment, glyphs, privacy
   ambient fetch --ttl N --name N URL  cached fetch with rate-limit backoff
@@ -277,6 +294,38 @@ func cmdSetup(args []string) {
 		if err := runSetup(target); err != nil {
 			die(err)
 		}
+	}
+}
+
+// cmdChip is the writer side of the status-bar chip convention, built for
+// screen scripts:
+//
+//	ambient chip <name> clear                          — healthy, go silent
+//	ambient chip <name> <color> <prio> <text> [...]    — triples
+func cmdChip(args []string) {
+	if len(args) < 2 {
+		die(fmt.Errorf("usage: ambient chip <name> clear | <color> <prio> <text> [...]"))
+	}
+	name, rest := args[0], args[1:]
+	if len(rest) == 1 && rest[0] == "clear" {
+		if err := status.Write(name, nil); err != nil {
+			die(err)
+		}
+		return
+	}
+	if len(rest) < 3 || len(rest)%3 != 0 {
+		die(fmt.Errorf("chips come as <color> <prio> <text> triples"))
+	}
+	var chips []status.Chip
+	for i := 0; i < len(rest); i += 3 {
+		prio, err := strconv.Atoi(rest[i+1])
+		if err != nil {
+			die(fmt.Errorf("prio must be a number: %q", rest[i+1]))
+		}
+		chips = append(chips, status.Chip{Color: rest[i], Prio: prio, Text: rest[i+2]})
+	}
+	if err := status.Write(name, chips); err != nil {
+		die(err)
 	}
 }
 

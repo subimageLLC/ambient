@@ -14,6 +14,12 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
+type Pane struct {
+	Entry   string
+	Split   string // "v" stacked below the main entry, "h" side by side
+	Percent int    // size of the new pane, 5-90
+}
+
 type Manifest struct {
 	Name          string
 	Mode          string
@@ -26,6 +32,7 @@ type Manifest struct {
 	Reads         []string
 	Contacts      []string
 	Keys          []string
+	Panes         []Pane
 }
 
 type Screen struct {
@@ -60,6 +67,25 @@ func LoadManifest(dir string) (Manifest, error) {
 	}
 	if m.Refresh <= 0 {
 		m.Refresh = 60
+	}
+	for i := range m.Panes {
+		p := &m.Panes[i]
+		if p.Entry == "" {
+			return m, fmt.Errorf("%s: pane %d: entry is required", dir, i+1)
+		}
+		switch p.Split {
+		case "":
+			p.Split = "v"
+		case "v", "h":
+		default:
+			return m, fmt.Errorf("%s: pane %d: split must be \"v\" or \"h\"", dir, i+1)
+		}
+		switch {
+		case p.Percent == 0:
+			p.Percent = 50
+		case p.Percent < 5 || p.Percent > 90:
+			return m, fmt.Errorf("%s: pane %d: percent must be 5-90", dir, i+1)
+		}
 	}
 	return m, nil
 }
