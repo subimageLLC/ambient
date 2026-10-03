@@ -1,0 +1,16 @@
+# events — what happened, when, and whether it is still broken.
+# Replaces the old logs screen: raw streams were unactionable; this screen
+# mines the journal with small local rules (no agent, no cloud).
+#   linux: systemd unit failures + crash loops (✓/× from systemctl),
+#          OOM kills, disk I/O errors, ssh brute-force
+#   macOS: hum only (no systemd/kernel journal to mine)
+# hum footer: all other errors grouped by source; mute acknowledged noise
+# in ~/.config/ambient/screens/events-mute (one source per line).
+name     = "events"
+mode     = "interactive"
+entry    = "screen.sh"
+needs    = ["journalctl|log"]
+glyphs   = "plain"
+reads    = ["~/.config/ambient/screens/events-mute"]
+contacts = []
+keys     = ["no in-screen keys — informational"]
