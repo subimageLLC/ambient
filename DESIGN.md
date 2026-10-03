@@ -65,7 +65,7 @@ Users never edit config files by hand:
   catalog (cached), so any listed coin can be added. `a` reopens the picker
   anytime, `x` removes the selected coin. Saves to
   `~/.config/ambient/screens/coins.conf`.
-- **clock/weather** — `ambient setup clock` asks for a zipcode, city, or
+- **now (time+weather)** — `ambient setup now` asks for a zipcode, city, or
   lat,lon, validates it against wttr.in, and saves it. The query string is the
   only thing about the user that leaves the machine.
 - **net** — works with defaults; `ambient setup net` changes the WAN target.
@@ -91,10 +91,58 @@ Faithful port of the kiosk's proven renderers: braille line grid
 `--json` emits rows + lo/hi/last_row for labeling. `glyphs = "ascii"` in
 config degrades braille/blocks to `#`.
 
+## Screen contract
+
+A screen is a directory with a `manifest.toml` and an entrypoint. Screens may
+declare extra panes (`[[panes]]` with `entry`, `split` v/h, `percent`); each
+pane runs a script that owns its own loop. Passive screens are wrapped by
+`ambient run` (clear, exec, sleep refresh, backoff on fast failures);
+interactive screens and all panes run raw.
+
+## Events, not logs (the events screen)
+
+A raw log stream on an ambient display is noise theater — unreadable from
+across the room, unactionable up close. The events screen turns the journal
+into a few plain-language statements — what happened, when, and whether it
+is still broken (✓ fixed / × down / ⚠ live). Small local pattern rules do
+the work; no agent, no cloud:
+
+- systemd unit failures and crash loops (restart counters), with live state
+  from `systemctl is-active` deciding ✓/×
+- OOM kills, disk I/O errors (per device), ssh brute-force (top attacker)
+- everything else collapses into a one-line "hum" footer, grouped by
+  source, muteable (acknowledged noise stays visible but stops paging)
+
+The status chip names the worst *unresolved* event (`⚠relay-1 down`), so
+the bar says what to do, not how loud the machine is. macOS has no systemd
+or kernel journal — the screen degrades honestly to grouped hum.
+
+## Status chips
+
+The status bar is the ambient health surface, visible on every screen.
+Writers (screen scripts, private integrations — anything) call:
+
+    ambient chip <writer> <color> <prio> <text> [...]   # or: clear
+
+which stores `~/.cache/ambient/status/<writer>.json`. The ticker renders all
+writers into `status-right` on every rotation, and the builder renders once
+at build time — chips never vanish on a rebuild. Ordering: prio ascending,
+then writer name; a writer older than 15 minutes collapses to a dim `name?`
+chip so a dead writer is visible, not silent. Silence means healthy: writers
+clear their file when there is nothing to report.
+
 ## TUI conventions
 
 Screens are plain scripts, so the shared look lives in convention rather
 than a framework. Anything user-facing follows these rules:
+
+- **Screens adapt to their pane.** The same screen runs fullscreen on an
+  800x480 kiosk, in a corner terminal, and inside a split. Each screen reads
+  its own geometry (`tput cols`/`lines`) and reflows: narrow panes drop
+  columns rather than truncating rows, short panes drop low-priority
+  sections, and lines are cut to width — never wrapped (a wrapped line
+  scrolls the whole pane and crawls). clock centers by size, coins grows a
+  market-cap column past 64 cols; every screen follows the same rule.
 
 - **Spinners lead their text.** `▃ searching coingecko…`, never
   `loading chart… ▇`. One spinner glyph set everywhere (the bar wave
@@ -152,7 +200,7 @@ than a framework. Anything user-facing follows these rules:
 1. Core start/attach/rotate/pause/rebuild + ticker
 2. fetch + chart subcommands
 3. Screen loader (embedded + private merge)
-4. Core screens: coins, clock/weather, net, sys
+4. Core screens: coins, now (time+weather), net, sys
 5. doctor
 6. Kiosk recipes, goreleaser, tap
 7. Dogfood on the kiosk as its replacement

@@ -1,10 +1,13 @@
-name     = "clock"
+# now — the glance screen: block-digit time, date, weather (Now/Today/
+# Tomorrow), NWS alert line. Renamed from "clock" 2026-10-02: it long ago
+# stopped being only a clock. Reads now.conf (falls back to clock.conf).
+name     = "now"
 mode     = "interactive"
 entry    = "screen.sh"
 setup    = "setup.sh"
 needs    = ["toilet", "jq", "network"]
 glyphs   = "plain"
-reads    = ["~/.config/ambient/screens/clock.conf", "~/.cache/ambient/weather.json", "~/.cache/ambient/weather-alerts.json"]
+reads    = ["~/.config/ambient/screens/now.conf", "~/.cache/ambient/weather.json", "~/.cache/ambient/weather-alerts.json"]
 contacts = ["wttr.in", "api.weather.gov"]
 keys     = ["no in-screen keys — press C-b * to set location"]
 

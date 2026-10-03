@@ -20,25 +20,44 @@ func check(exe string) string {
 	return "missing"
 }
 
+// pkgManagerFor maps /etc/os-release content to a package manager. The
+// specific IDs matter: RHEL/CentOS/Rocky/Alma carry ID_LIKE=fedora today,
+// but matching the IDs keeps working if that ever changes; suse is checked
+// before the fedora family to avoid any ID_LIKE ambiguity.
+func pkgManagerFor(osRelease string) string {
+	id := strings.ToLower(osRelease)
+	switch {
+	case strings.Contains(id, "debian") || strings.Contains(id, "ubuntu") || strings.Contains(id, "raspbian"):
+		return "apt"
+	case strings.Contains(id, "suse") || strings.Contains(id, "sles"):
+		return "zypper"
+	case strings.Contains(id, "fedora") || strings.Contains(id, "rhel") ||
+		strings.Contains(id, "centos") || strings.Contains(id, "rocky") ||
+		strings.Contains(id, "almalinux") || strings.Contains(id, "oracle"):
+		return "dnf"
+	case strings.Contains(id, "arch"): // arch, manjaro, endeavouros (ID_LIKE=arch)
+		return "pacman"
+	case strings.Contains(id, "alpine"):
+		return "apk"
+	}
+	return ""
+}
+
 func pkgManager() string {
 	if _, err := exec.LookPath("brew"); err == nil {
 		return "brew"
 	}
 	b, err := os.ReadFile("/etc/os-release")
-	if err == nil {
-		id := strings.ToLower(string(b))
-		switch {
-		case strings.Contains(id, "debian") || strings.Contains(id, "ubuntu") || strings.Contains(id, "raspbian"):
-			return "apt"
-		case strings.Contains(id, "fedora"):
-			return "dnf"
-		case strings.Contains(id, "arch"):
-			return "pacman"
-		case strings.Contains(id, "alpine"):
-			return "apk"
-		}
+	if err != nil {
+		return ""
 	}
-	return ""
+	return pkgManagerFor(string(b))
+}
+
+// install verbs per package manager — not all use "install"
+var installVerbs = map[string]string{
+	"pacman": "-S",
+	"apk":    "add",
 }
 
 func installHint(dep string) string {
@@ -46,11 +65,19 @@ func installHint(dep string) string {
 	if pm == "" {
 		return ""
 	}
-	verb := "install"
-	if pm == "pacman" {
-		verb = "-S"
+	verb := installVerbs[pm]
+	if verb == "" {
+		verb = "install"
 	}
 	return fmt.Sprintf("→ %s %s %s", pm, verb, dep)
+}
+
+// journalReadable reports whether this user can read the SYSTEM journal —
+// on arch (and stock RHEL) a default user cannot, which silently starves
+// the events screen: journalctl exists but returns nothing.
+func journalReadable() bool {
+	out, err := exec.Command("journalctl", "--system", "-n", "1", "--no-pager", "-o", "cat").Output()
+	return err == nil && len(strings.TrimSpace(string(out))) > 0
 }
 
 func probe(url string) string {
@@ -78,14 +105,37 @@ func Run(c cfg.Config, screens []screen.Screen) {
 			if need == "network" {
 				continue
 			}
-			status := check(need)
+			// "a|b" — any one of the alternatives satisfies the need
+			// (e.g. "journalctl|log": linux journal vs macOS unified log)
+			alts := strings.Split(need, "|")
+			status := "missing"
+			for _, a := range alts {
+				if check(a) == "ok" {
+					status = "ok"
+					break
+				}
+			}
 			line := fmt.Sprintf("%-11s %-7s (for %s)", need, status, s.Name)
 			if status == "missing" {
-				if h := installHint(need); h != "" {
-					line += "  " + h
+				var hints []string
+				for _, a := range alts {
+					if h := installHint(a); h != "" {
+						hints = append(hints, h)
+					}
+				}
+				if len(hints) > 0 {
+					line += "  " + strings.Join(hints, " / ")
 				}
 			}
 			fmt.Println(line)
+		}
+	}
+	// the events screen's data source — existence is not readability
+	if check("journalctl") == "ok" {
+		if journalReadable() {
+			fmt.Printf("%-11s %s\n", "journal", "readable")
+		} else {
+			fmt.Printf("%-11s %s\n", "journal", "empty for this user — add yourself to the systemd-journal (or adm) group, or events shows nothing")
 		}
 	}
 	t := os.Getenv("TERM")

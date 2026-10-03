@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # faithful port of the kiosk's screen-clock (toilet big time + wttr.in rows)
-# deltas from the kiosk: LOC/label from clock.conf, caches under AMBIENT_CACHE_DIR,
+# deltas from the kiosk: LOC/label from now.conf, caches under AMBIENT_CACHE_DIR,
 # portable stat, empty loc = clock without weather.
 FONT="${FONT:-mono12}"
 CONF_DIR="${AMBIENT_CONFIG_DIR:-$HOME/.config/ambient}/screens"
-CONF="$CONF_DIR/clock.conf"
+CONF="$CONF_DIR/now.conf"
+[ -f "$CONF" ] || CONF="$CONF_DIR/clock.conf"   # pre-rename configs still work
 LOC=""
 CITY=""
 [ -f "$CONF" ] && while IFS='=' read -r k v; do
@@ -52,7 +53,7 @@ install_hint() {
 while [ -n "$(missing_deps)" ]; do
     M=$(missing_deps)
     printf '\033[H\033[2J'
-    printf ' clock: missing%s\n\n' "$M"
+    printf ' now: missing%s\n\n' "$M"
     printf '  %s\n\n' "$(install_hint "$M")"
     printf ' this pane recovers automatically once installed\n'
     sleep 30
@@ -137,7 +138,7 @@ while :; do
         if [ -n "$LOC" ]; then
             weather || { W_OUT=("$DIM weather unavailable$OFF"); W_PLAIN=(" weather unavailable"); ALERT_OUT=""; ALERT_PLAIN=""; }
         else
-            W_OUT=("$DIM set location: ambient setup clock$OFF"); W_PLAIN=(" set location: ambient setup clock"); ALERT_OUT=""; ALERT_PLAIN=""
+            W_OUT=("$DIM set location: ambient setup now$OFF"); W_PLAIN=(" set location: ambient setup now"); ALERT_OUT=""; ALERT_PLAIN=""
         fi
     fi
 
