@@ -20,6 +20,7 @@ while :; do
         HINT='install docker with your package manager'
         command -v brew    >/dev/null 2>&1 && HINT='brew install --cask docker (or colima + docker-cli)'
         command -v apt-get >/dev/null 2>&1 && HINT='sudo apt install docker.io'
+        command -v zypper  >/dev/null 2>&1 && HINT='sudo zypper install docker'
         printf '\033[2J'
         printf ' docker: missing docker\n\n'
         printf '  %s\n\n' "$HINT"

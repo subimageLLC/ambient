@@ -54,11 +54,31 @@ var colors = map[string]string{
 	"default": "#93a1a1",
 }
 
-func Color(hexOrName string) string {
-	if c, ok := colors[hexOrName]; ok {
+// Color resolves a chip color to a solarized hex. Known names map; valid
+// #rrggbb passes through; anything else falls back to default so a typo'd
+// chip can never inject an invalid tmux style and wedge the whole bar.
+func Color(name string) string {
+	if c, ok := colors[name]; ok {
 		return c
 	}
-	return hexOrName
+	if isHex(name) {
+		return name
+	}
+	return colors["default"]
+}
+
+func isHex(s string) bool {
+	if len(s) != 7 || s[0] != '#' {
+		return false
+	}
+	for _, r := range s[1:] {
+		switch {
+		case r >= '0' && r <= '9', r >= 'a' && r <= 'f', r >= 'A' && r <= 'F':
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 func Dir() string { return filepath.Join(cfg.CacheDir(), "status") }
@@ -153,11 +173,7 @@ func Render(entries []Entry, now time.Time) string {
 			fmt.Fprintf(&b, "#[fg=%s] %s?#[default]", colors["dim"], f.writer)
 			continue
 		}
-		col := Color(f.chip.Color)
-		if col == "" {
-			col = colors["red"]
-		}
-		fmt.Fprintf(&b, "#[fg=%s,bold] %s#[default]", col, f.chip.Text)
+		fmt.Fprintf(&b, "#[fg=%s,bold] %s#[default]", Color(f.chip.Color), f.chip.Text)
 	}
 	b.WriteString(" #[fg=#93a1a1,bold]? keys #[default]#[fg=#586e75]· #[default]#[fg=#93a1a1,bold]* setup #[default]#[fg=#586e75]· %H:%M %d-%b ")
 	return b.String()

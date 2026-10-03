@@ -4,6 +4,7 @@ CONF_DIR="${AMBIENT_CONFIG_DIR:-$HOME/.config/ambient}/screens"
 CONF="$CONF_DIR/net.conf"
 WAN=1.1.1.1
 [ -f "$CONF" ] && WAN=$(sed -n 's/^wan=//p' "$CONF" | tail -1)
+: "${WAN:=1.1.1.1}"   # hand-edited/empty conf must not hand gping an empty target
 
 GW=""
 if command -v ip >/dev/null 2>&1; then
@@ -17,6 +18,7 @@ while ! command -v gping >/dev/null 2>&1; do
     command -v brew >/dev/null 2>&1 && HINT='brew install gping'
     command -v apt-get >/dev/null 2>&1 && HINT='sudo apt install gping'
     command -v dnf >/dev/null 2>&1 && HINT='sudo dnf install gping'
+    command -v zypper >/dev/null 2>&1 && HINT='sudo zypper install gping'
     command -v pacman >/dev/null 2>&1 && HINT='sudo pacman -S gping'
     printf '\033[H\033[2J'
     printf ' net: missing gping\n\n'

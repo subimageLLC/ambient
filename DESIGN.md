@@ -184,9 +184,10 @@ than a framework. Anything user-facing follows these rules:
 
 1. `ambient attach` — mirror into any terminal
 2. `ambient start` in a local terminal — instant demo
-3. Kiosk target: `targets/` ships recipes (Linux: getty autologin → xinit →
-   kitty fullscreen; macOS: login item + kitty fullscreen) with the solarized
-   kitty.conf.
+3. Kiosk target (planned, not yet shipped): `targets/` will carry recipes
+   (Linux: getty autologin → xinit → kitty fullscreen; macOS: login item +
+   kitty fullscreen) with the solarized kitty.conf. Until then, the kiosk's
+   AMBIENT-README.md documents a working boot flow to copy from.
 
 ## Packaging & CI
 

@@ -86,6 +86,24 @@ func TestRenderEmpty(t *testing.T) {
 	}
 }
 
+func TestColorClampsUnknowns(t *testing.T) {
+	cases := map[string]string{
+		"red":         "#dc322f", // known name
+		"#268bd2":     "#268bd2", // valid hex passes through
+		"#268BD2":     "#268BD2", // uppercase hex too
+		"purple":      "#93a1a1", // unknown name -> default, never passed to tmux
+		"":            "#93a1a1",
+		"#12345":      "#93a1a1", // malformed hex
+		"#12G4567":    "#93a1a1",
+		"red; rm -rf": "#93a1a1", // hostile garbage
+	}
+	for in, want := range cases {
+		if got := Color(in); got != want {
+			t.Errorf("Color(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
 func indexOf(s, sub string) int {
 	for i := 0; i+len(sub) <= len(s); i++ {
 		if s[i:i+len(sub)] == sub {
