@@ -1,0 +1,10 @@
+# sec — full-screen security rail (port of the kiosk's screen-sec).
+# threats (optional unifi feed) · ssh brute-force 24h · exposed ports
+name     = "sec"
+mode     = "interactive"
+entry    = "screen.sh"
+needs    = ["jq"]
+glyphs   = "plain"
+reads    = ["~/.cache/ambient/unifi.json"]
+contacts = []
+keys     = ["no in-screen keys — informational"]

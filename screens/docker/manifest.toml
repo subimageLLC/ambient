@@ -1,0 +1,11 @@
+# read-only docker health screen (port of the kiosk's screen-docker).
+# Opt-in interactive variant: run lazydocker yourself, or add a scoped
+# sudoers entry — see README "docker screen".
+name     = "docker"
+mode     = "interactive"
+entry    = "screen.sh"
+needs    = ["docker"]
+glyphs   = "plain"
+reads    = []
+contacts = []
+keys     = ["no in-screen keys — read-only; run lazydocker in a terminal for control"]
