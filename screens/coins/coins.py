@@ -673,6 +673,9 @@ def draw(stdscr):
         curses.init_pair(7, 8, -1)
 
     sel = 0
+    sel_cid = None  # the selected COIN, persistent across frames — never
+    # derive it from an index into a differently-ordered list (config vs
+    # mcap-sorted); that made the highlight bounce between neighbors
     tfs = [("D", 1), ("W", 7), ("M", 30), ("Y", 365)]
     tfi = 0
     anim = 0
@@ -690,18 +693,17 @@ def draw(stdscr):
     while True:
         # order the ticker by market cap (top to bottom); unknown mcap
         # sinks to the bottom, keeping config order (stable sort), and the
-        # selection follows its coin across any reorder
+        # selection follows its COIN across any reorder
         IDS = load_coins()
-        prev_cid = IDS[sel][0] if sel < len(IDS) else None
         if by_id:
             IDS = sorted(
                 IDS,
                 key=lambda e: -((by_id.get(e[0]) or {}).get("market_cap") or 0),
             )
         sel = 0
-        if prev_cid:
+        if sel_cid:
             for i, (cid, _) in enumerate(IDS):
-                if cid == prev_cid:
+                if cid == sel_cid:
                     sel = i
                     break
         anim += 1
@@ -874,6 +876,11 @@ def draw(stdscr):
             FORCE.add(markets_url([cid for cid, _ in load_coins()]))
             if IDS and sel < len(IDS):
                 FORCE.add(chart_url(IDS[sel][0], tfs[tfi][1]))
+
+        # carry the selected coin (not an index) into the next frame —
+        # the reorder above must never move the selection by itself
+        if IDS:
+            sel_cid = IDS[sel][0]
 
 
 def main():
