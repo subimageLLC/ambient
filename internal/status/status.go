@@ -83,9 +83,42 @@ func isHex(s string) bool {
 
 func Dir() string { return filepath.Join(cfg.CacheDir(), "status") }
 
+// validName gates writer names to [A-Za-z0-9_-]: the name becomes both a
+// filename and (when stale) a literal in tmux's status-right, so it must
+// never carry path separators, traversal, or format metacharacters.
+func validName(name string) bool {
+	if name == "" || len(name) > 64 {
+		return false
+	}
+	for _, r := range name {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '-', r == '_':
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// tmuxEscape makes a string safe to interpolate into a tmux format string:
+// "#" starts every format construct (#(shell), #{var}, ##), so double it,
+// and control characters have no business in a status bar.
+func tmuxEscape(s string) string {
+	s = strings.Map(func(r rune) rune {
+		if r < 0x20 || r == 0x7f {
+			return -1
+		}
+		return r
+	}, s)
+	return strings.ReplaceAll(s, "#", "##")
+}
+
 // Write replaces the state for one writer. An empty chip set removes the
 // file — healthy writers go silent, not stale.
 func Write(name string, chips []Chip) error {
+	if !validName(name) {
+		return fmt.Errorf("invalid writer name %q (use [A-Za-z0-9_-])", name)
+	}
 	dir := Dir()
 	if len(chips) == 0 {
 		err := os.Remove(filepath.Join(dir, name+".json"))
@@ -102,7 +135,7 @@ func Write(name string, chips []Chip) error {
 	if err != nil {
 		return err
 	}
-	tmp := filepath.Join(dir, name+".json.tmp")
+	tmp := filepath.Join(dir, fmt.Sprintf("%s.json.%d.tmp", name, os.Getpid()))
 	if err := os.WriteFile(tmp, b, 0o644); err != nil {
 		return err
 	}
@@ -170,10 +203,10 @@ func Render(entries []Entry, now time.Time) string {
 	var b strings.Builder
 	for _, f := range all {
 		if f.stale {
-			fmt.Fprintf(&b, "#[fg=%s] %s?#[default]", colors["dim"], f.writer)
+			fmt.Fprintf(&b, "#[fg=%s] %s?#[default]", colors["dim"], tmuxEscape(f.writer))
 			continue
 		}
-		fmt.Fprintf(&b, "#[fg=%s,bold] %s#[default]", Color(f.chip.Color), f.chip.Text)
+		fmt.Fprintf(&b, "#[fg=%s,bold] %s#[default]", Color(f.chip.Color), tmuxEscape(f.chip.Text))
 	}
 	b.WriteString(" #[fg=#93a1a1,bold]? keys #[default]#[fg=#586e75]· #[default]#[fg=#93a1a1,bold]* setup #[default]#[fg=#586e75]· %H:%M %d-%b ")
 	return b.String()

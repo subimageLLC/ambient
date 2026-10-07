@@ -27,4 +27,11 @@ while ! command -v gping >/dev/null 2>&1; do
     sleep 30
 done
 
-exec gping ${GW:+"$GW"} "$WAN"
+# retry loop, not exec: if gping dies (or chokes on a bad conf value) the
+# pane says so and recovers instead of going permanently dead
+while :; do
+    gping -- ${GW:+"$GW"} "$WAN"
+    printf '\033[2J'
+    printf ' net: gping exited — retrying in 30s (wan target: %s)\n' "$WAN"
+    sleep 30
+done

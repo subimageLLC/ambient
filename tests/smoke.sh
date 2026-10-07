@@ -26,8 +26,10 @@ AMBIENT_DATA_DIR=$(mktemp -d)/d
 mkdir -p "$AMBIENT_CONFIG_DIR"
 
 # runners lack most screen deps; the screens must still render their
-# graceful-availability states
-printf 'screens = ["now", "net", "docker", "events", "sec"]\nrotation_secs = 5\n' \
+# graceful-availability states. coins included on purpose: a python
+# startup crash (e.g. a NameError from a "cleanup") kills its window
+# before remain-on-exit lands — that class belongs in CI, not on a kiosk
+printf 'screens = ["now", "net", "coins", "docker", "events", "sec"]\nrotation_secs = 5\n' \
     > "$AMBIENT_CONFIG_DIR/ambient.toml"
 
 note "env: $AMBIENT_CONFIG_DIR"
@@ -37,7 +39,7 @@ note "env: $AMBIENT_CONFIG_DIR"
 sleep 8   # let every screen run at least one frame
 
 windows=$(tmux list-windows -t "$AMBIENT_SESSION" -F '#W' 2>/dev/null | tr '\n' ' ')
-[ "$windows" = "now net docker events sec " ] && ok "windows: $windows" || bad "windows: got [$windows]"
+[ "$windows" = "now net coins docker events sec " ] && ok "windows: $windows" || bad "windows: got [$windows]"
 
 # ---- per-pane assertions ------------------------------------------------
 capture() { tmux capture-pane -p -t "$AMBIENT_SESSION:$1" 2>/dev/null; }
@@ -59,6 +61,8 @@ pane_ok now    "now"
 capture now | grep -qE "$(date +%A)|now: missing|location" && ok "now content" || bad "now: no date/hint"
 pane_ok docker "docker"
 want   docker "docker" "docker header"
+pane_ok coins "coins"
+capture coins | grep -qE "BTC|\[D\]\[W\]|terminal too small|loading" && ok "coins content" || bad "coins: no render"
 pane_ok events "events"
 want   events "EVENTS" "events header"
 pane_ok sec    "sec"

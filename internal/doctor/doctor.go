@@ -82,7 +82,10 @@ func journalReadable() bool {
 
 func probe(url string) string {
 	client := &http.Client{Timeout: 5 * time.Second}
-	req, _ := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "unreachable" // malformed URL in a manifest — never panic doctor
+	}
 	req.Header.Set("User-Agent", "ambient")
 	resp, err := client.Do(req)
 	if err != nil {

@@ -34,7 +34,10 @@ while :; do
         ((.Peer // {}) | to_entries | map(.value) | sort_by(.Online | not) | .[] |
             "  " + (if .Online then "\u001b[1;32m●\u001b[0m" else "\u001b[90m○\u001b[0m" end)
             + " " + (.HostName // "?") + " \u001b[2m" + (.OS // "") + "\u001b[0m")' 2>/dev/null \
-        | awk -v w="$W" -v max="$max" 'NR <= max { print substr($0, 1, w) "\033[K" }'
+        | awk -v w="$W" -v max="$max" '{
+            gsub(/[[:cntrl:]]/, "")   # peer names are untrusted; no escape injection
+            if (NR <= max) print substr($0, 1, w) "\033[K"
+        }'
 
     hidden=$((total + 1 - max))
     [ "$hidden" -gt 0 ] && printf '\033[2m  +%d more peers\033[0m\n' "$hidden"

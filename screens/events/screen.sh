@@ -12,6 +12,15 @@
 #   (unit names, proc names, "kernel:<driver>"); muted sources stop paging
 #   but stay counted in the hum.
 EXE="${AMBIENT_EXE:-ambient}"
+# RUNP: never let a wedged journalctl/log wedge the pane (docker screen
+# does the same for docker calls)
+RUNP() {
+    if command -v timeout >/dev/null 2>&1; then
+        timeout 15 "$@"
+    else
+        "$@"
+    fi
+}
 CONF="${AMBIENT_CONFIG_DIR:-$HOME/.config/ambient}/screens"
 MUTE="$CONF/events-mute"
 C="\033[1;36m"; D="\033[2m"; G="\033[1;32m"; Y="\033[1;33m"; R="\033[1;31m"; OFF="\033[0m"
@@ -57,19 +66,17 @@ ssh_unit() {
     return 1
 }
 
-# systemd unit events from the last 24h: fail/restart per unit, first+last seen.
-# No _PID=1/_COMM=systemd field match here — some journalds (the kiosk's volatile
-# journal, pre-reboot config change) skip trusted fields for pid-1's own
-# messages; the awk prefix match on the "systemd[1]:" tag is the portable bit.
+# systemd unit events from the last 24h: fail/restart per unit, first+last
+# seen as EPOCH SECONDS (short-unix). No _PID=1/_COMM=systemd field match
+# here — some journalds (the kiosk's volatile journal, pre-reboot config change)
+# skip trusted fields for pid-1's own messages; the awk prefix match on the
+# "systemd[1]:" tag is the portable bit. Epochs (not month-name stamps)
+# keep sorting and duration math correct across month/year boundaries.
 unit_events() {
-    journalctl --since "-24 hours" --no-pager -o short 2>/dev/null | awk -v mf="$MUTE" "$MUTE_AWK"'
+    RUNP journalctl --since "-24 hours" --no-pager -o short-unix 2>/dev/null | awk -v mf="$MUTE" "$MUTE_AWK"'
         {
             line = $0
-            # stamp = "Oct 02 17:03" — full date, not bare time: a 24h
-            # window crosses midnight, and a bare HH:MM would resolve to
-            # TODAY when computing durations (negative minutes for events
-            # from the day before)
-            stamp = $1 " " $2 " " substr($3, 1, 5)
+            ep = int($1)
             if (!sub(/^.*systemd\[[0-9]+\]: /, "", line)) next
             unit = line
             if (!sub(/: .*/, "", unit)) next
@@ -80,15 +87,15 @@ unit_events() {
                 why = msg
                 sub(/^Failed with result ./, "", why)
                 sub("\047\\.$", "", why)
-                if (!(unit in first) || stamp < first[unit]) first[unit] = stamp
-                last[unit] = stamp
+                if (!(unit in first) || ep < first[unit]) first[unit] = ep
+                last[unit] = ep
                 reason[unit] = why
                 fail[unit] = 1
             } else if (msg ~ /restart counter is at/) {
                 match($0, /restart counter is at [0-9]+/)
                 n = substr($0, RSTART + 22, RLENGTH - 22) + 0
                 if (n > rst[unit]) rst[unit] = n
-                last[unit] = stamp
+                last[unit] = ep
             }
         }
         END {
@@ -104,19 +111,19 @@ unit_events() {
 
 # kernel events from the last 24h: OOM kills and disk I/O errors, per target
 kernel_events() {
-    journalctl -k --since "-24 hours" --no-pager -o short 2>/dev/null | awk -v mf="$MUTE" "$MUTE_AWK"'
+    RUNP journalctl -k --since "-24 hours" --no-pager -o short-unix 2>/dev/null | awk -v mf="$MUTE" "$MUTE_AWK"'
         /Out of memory: Killed process/ {
             p = $0
             sub(/^.*Killed process [0-9]+ \(/, "", p)
             sub(/\).*$/, "", p)
             if (("kernel:" p) in mute) next
-            oomn[p]++; oomt[p] = $1 " " $2 " " substr($3, 1, 5)
+            oomn[p]++; oomt[p] = int($1)
         }
         /I\/O error, dev / {
             match($0, /dev [a-z]+[0-9]*/)
             d = substr($0, RSTART + 4, RLENGTH - 4)
             if (("kernel:" d) in mute) next
-            ion[d]++; iot[d] = $1 " " $2 " " substr($3, 1, 5)
+            ion[d]++; iot[d] = int($1)
         }
         END {
             for (p in oomn) print "oom\t" oomt[p] "\t" oomt[p] "\t" p "\tOOM\t" oomn[p]
@@ -129,21 +136,21 @@ kernel_events() {
 # bad hour on an internet-facing box
 ssh_events() {
     unit=$1
-    now=$(date '+%b %d %H:%M')
-    journalctl -u "$unit" --since "-1 hours" --no-pager -o short 2>/dev/null \
+    nowep=$(date +%s)
+    RUNP journalctl -u "$unit" --since "-1 hours" --no-pager -o short 2>/dev/null \
         | grep -oE 'Failed [^ ]+ .+ from ([0-9]+\.){3}[0-9]+' \
         | grep -oE '([0-9]+\.){3}[0-9]+' \
         | sort | uniq -c | sort -rn | head -1 \
-        | awk -v mf="$MUTE" -v now="$now" "$MUTE_AWK"'
-            $1 >= 20 && !($2 in mute) { print "1\t" now "\tlive\t" $2 "\tssh: " $1 " failed logins (1h)" }'
+        | awk -v mf="$MUTE" -v nowep="$nowep" "$MUTE_AWK"'
+            $1 >= 20 && !($2 in mute) { print "1\t" nowep "\tlive\t" $2 "\tssh: " $1 " failed logins (1h)" }'
 }
 
 # hum: every other error, grouped by source, last hour (both platforms)
 hum_grouped() {
     if [ "$BACKEND" = journal ]; then
-        journalctl -p err --since "-1 hours" --no-pager -o short 2>/dev/null
+        RUNP journalctl -p err --since "-1 hours" --no-pager -o short 2>/dev/null
     else
-        log show --last 1h --style compact --predicate 'messageType == error' 2>/dev/null
+        RUNP log show --last 1h --style compact --predicate 'messageType == error' 2>/dev/null
     fi | awk -v mf="$MUTE" -v backend="$BACKEND" "$MUTE_AWK"'
         /^[A-Z][a-z][a-z] [ 0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9] / {
             src = $5
@@ -185,7 +192,9 @@ while :; do
             [ -z "${unit:-}" ] && continue
             res=$(systemctl show "$unit" -p Result --value 2>/dev/null)
             load=$(systemctl show "$unit" -p LoadState --value 2>/dev/null)
-            mins=$(( ($(date +%s) - $(date -d "$first" +%s 2>/dev/null || date +%s)) / 60 ))
+            # first is an epoch now — no date parsing, so month/year
+            # boundaries can never produce negative durations
+            mins=$(( ($(date +%s) - ${first:-$(date +%s)}) / 60 ))
             dur=$(durfmt "$mins")
             loop=""
             [ "${rst:-0}" -ge 3 ] && loop=", restarted ${rst}×"
@@ -262,8 +271,8 @@ EOF
     maxrows=$((ROWS - 3))
     [ "$maxrows" -lt 1 ] && maxrows=1
     if [ "$total" -gt 0 ]; then
-        printf '%s\n' "$ev" | sort -t"$(printf '\t')" -k1,1n -k2,2r | head -"$maxrows" \
-        | while IFS="$(printf '\t')" read -r _ tm state kind text; do
+        printf '%s\n' "$ev" | sort -t"$(printf '\t')" -k1,1n -k2,2rn | head -"$maxrows" \
+        | while IFS="$(printf '\t')" read -r _ ep state kind text; do
             [ -z "${text:-}" ] && continue
             case "$state" in
                 down) mark="× down"; g="$R" ;;
@@ -271,9 +280,13 @@ EOF
                 fix)  mark="✓ fix "; g="$G" ;;
                 *)    mark="↻ loop"; g="$Y" ;;
             esac
+            # field 2 is an epoch; journal fields in the text are untrusted —
+            # strip control bytes before they reach a terminal
+            tm=$(date -d "@${ep:-0}" '+%b %d %H:%M' 2>/dev/null || echo "?")
+            body=$(printf '%s — %s' "$kind" "$text" | tr -d '\000-\037\177')
             # prefix " Oct 02 17:03  " + %-7s mark + space ≈ 24 cols
             printf ' %b%s%b  %b%-7s%b %b%s%b\n' \
-                "$D" "$tm" "$OFF" "$g" "$mark" "$OFF" "$g" "$(printf '%.*s' $((W - 24)) "$kind — $text")" "$OFF"
+                "$D" "$tm" "$OFF" "$g" "$mark" "$OFF" "$g" "$(printf '%.*s' $((W - 24)) "$body")" "$OFF"
         done
         if [ "$total" -gt "$maxrows" ]; then
             printf ' %b… +%d more\033[K\n' "$D" "$((total - maxrows))"
@@ -296,7 +309,7 @@ EOF
     # ---- chip: name the worst unresolved event ----
     worst=""
     if [ -n "$ev" ]; then
-        worst=$(printf '%s\n' "$ev" | sort -t"$(printf '\t')" -k1,1n -k2,2r \
+        worst=$(printf '%s\n' "$ev" | sort -t"$(printf '\t')" -k1,1n -k2,2rn \
             | awk -F'\t' '$1 == 1 { print $4 " " $5; exit }')
     fi
     if [ -n "$worst" ]; then

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import curses
+import glob
 import json
 import locale
 import os
@@ -14,6 +15,12 @@ try:
     locale.setlocale(locale.LC_ALL, "C.UTF-8")
 except locale.Error:
     pass
+
+# coingecko ids are slugs; anything else would corrupt cache paths or URLs
+# (a hand-edited conf or a hostile API response must not write outside the
+# cache dir)
+def valid_id(cid):
+    return bool(re.fullmatch(r"[a-z0-9-]{1,64}", cid or ""))
 
 DEFAULT_IDS = [
     ("bitcoin", "BTC"),
@@ -108,7 +115,7 @@ def load_coins():
                 if not line or line.startswith("#"):
                     continue
                 parts = line.split()
-                if len(parts) == 2:
+                if len(parts) == 2 and valid_id(parts[0]):
                     ids.append((parts[0], parts[1]))
     except FileNotFoundError:
         pass
@@ -374,7 +381,7 @@ def web_results(q):
     out = []
     for c in data.get("coins", []):
         cid = c.get("id")
-        if not cid:
+        if not cid or not valid_id(cid):
             continue
         sym = (c.get("symbol") or cid).upper()
         SEARCH_SYM[cid] = sym
@@ -394,7 +401,7 @@ def contract_lookup(q):
         if data is FETCH_MISS:
             continue
         cid = data.get("id")
-        if not cid:
+        if not cid or not valid_id(cid):
             continue
         sym = (data.get("symbol") or cid).upper()
         SEARCH_SYM[cid] = sym
@@ -883,8 +890,22 @@ def draw(stdscr):
             sel_cid = IDS[sel][0]
 
 
+def prune_caches():
+    # search/contract caches accumulate one file per query; drop entries
+    # untouched for a week so a long-lived kiosk does not fill the disk
+    cutoff = time.time() - 7 * 86400
+    for pat in ("screen-coins-search-*.json", "screen-coins-contract-*.json"):
+        for f in glob.glob(os.path.join(CACHE_DIR, pat)):
+            try:
+                if os.path.getmtime(f) < cutoff:
+                    os.unlink(f)
+            except OSError:
+                pass
+
+
 def main():
     os.makedirs(CACHE_DIR, exist_ok=True)
+    prune_caches()
     curses.wrapper(draw)
 
 

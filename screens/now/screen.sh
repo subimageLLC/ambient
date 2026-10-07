@@ -15,7 +15,7 @@ POINT=""
 read_conf() {
     local f="$CONF_DIR/now.conf"
     [ -f "$f" ] || f="$CONF_DIR/clock.conf"   # pre-rename configs still work
-    LOC=""; CITY=""
+    LOC=""; CITY=""; POINT=""
     [ -f "$f" ] && while IFS='=' read -r k v; do
         case "$k" in
             loc) LOC=$v ;;
@@ -144,11 +144,17 @@ weather() {
     return 0
 }
 
+sq() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
 run_setup() {
+    # setup.sh expects the config ROOT (it appends /screens itself) —
+    # CONF_DIR already ends in /screens, so strip it or the popup writes
+    # screens/screens/now.conf and the screen never sees the location
+    local root="${CONF_DIR%/screens}"
+    [ "$root" = "$CONF_DIR" ] && root="$(dirname "$CONF_DIR")"
     if [ -n "${TMUX:-}" ]; then
-        tmux display-popup -w 76 -h 16 -E "AMBIENT_CONFIG_DIR='$CONF_DIR' '$HERE/setup.sh'"
+        tmux display-popup -w 76 -h 16 -E "$(printf 'AMBIENT_CONFIG_DIR=%s %s' "$(sq "$root")" "$(sq "$HERE/setup.sh")")"
     else
-        env AMBIENT_CONFIG_DIR="$CONF_DIR" "$HERE/setup.sh"
+        env AMBIENT_CONFIG_DIR="$root" "$HERE/setup.sh"
     fi
     read_conf          # pick up the new location immediately
     weather_fetch

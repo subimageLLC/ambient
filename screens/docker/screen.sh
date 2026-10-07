@@ -62,7 +62,9 @@ while :; do
 
     down=0
     total=$($DC ps -aq 2>/dev/null | wc -l | tr -d ' ')
-    down=$($DC ps --format '{{.Status}}' 2>/dev/null | grep -Ecv '^(Up|healthy)' || true)
+    # chip: running containers in bad states — "Up ... (unhealthy)" still
+    # starts with Up, so match the bad words instead of inverting good ones
+    down=$($DC ps --format '{{.Status}}' 2>/dev/null | grep -Eci 'unhealthy|Restarting|Dead' || true)
     [ "${down:-0}" -gt 0 ] \
         && "$EXE" chip docker red 2 "⚠${down}cont" 2>/dev/null \
         || "$EXE" chip docker clear 2>/dev/null

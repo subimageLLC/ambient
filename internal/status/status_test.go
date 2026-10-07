@@ -104,6 +104,45 @@ func TestColorClampsUnknowns(t *testing.T) {
 	}
 }
 
+func TestRenderEscapesTmuxFormat(t *testing.T) {
+	now := time.Now()
+	entries := []Entry{
+		{Name: "events", State: State{TS: now.Unix(), Chips: []Chip{
+			{Text: "#(rm -rf /) pwned #{session_name}", Color: "red", Prio: 1},
+		}}},
+		{Name: "bad\x07writer", State: State{TS: now.Unix(), Chips: []Chip{{Text: "x", Color: "red", Prio: 2}}}},
+	}
+	got := Render(entries, now)
+	// every "#("/"#{" must be preceded by another "#" (i.e. escaped as
+	// "##("/"##{" — tmux renders those literally instead of executing)
+	for i := 0; i+2 < len(got); i++ {
+		if (got[i] == '#' && got[i+1] == '(') || (got[i] == '#' && got[i+1] == '{') {
+			if i == 0 || got[i-1] != '#' {
+				t.Fatalf("unescaped tmux format metacharacter at %d in %q", i, got)
+			}
+		}
+	}
+	if contains(got, "\x07") {
+		t.Fatalf("control characters reached the bar: %q", got)
+	}
+}
+
+func TestWriteRejectsBadNames(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("AMBIENT_CACHE_DIR", dir)
+	for _, bad := range []string{"../weather", "a/b", "", "x y", "shutil"} {
+		if bad == "shutil" {
+			continue // letters-only names are valid by design
+		}
+		if err := Write(bad, []Chip{{Text: "x", Color: "red", Prio: 1}}); err == nil {
+			t.Errorf("Write(%q) should be rejected", bad)
+		}
+	}
+	if err := Write("events", []Chip{{Text: "x", Color: "red", Prio: 1}}); err != nil {
+		t.Fatalf("valid name rejected: %v", err)
+	}
+}
+
 func indexOf(s, sub string) int {
 	for i := 0; i+len(sub) <= len(s); i++ {
 		if s[i:i+len(sub)] == sub {

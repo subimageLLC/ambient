@@ -22,11 +22,22 @@ import (
 
 // Name is the tmux session ambient builds. AMBIENT_SESSION overrides it —
 // used for side-by-side trials and tests so a live session is never touched.
+// The name is interpolated into tmux targets and format strings, so it is
+// restricted to [A-Za-z0-9_-]; anything else falls back to the default
+// rather than injecting into the gate expression.
 func Name() string {
-	if n := os.Getenv("AMBIENT_SESSION"); n != "" {
-		return n
+	n := os.Getenv("AMBIENT_SESSION")
+	if n == "" {
+		return "ambient"
 	}
-	return "ambient"
+	for _, r := range n {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '-', r == '_':
+		default:
+			return "ambient"
+		}
+	}
+	return n
 }
 
 type Options struct {

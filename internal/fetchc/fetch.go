@@ -33,6 +33,16 @@ type Result struct {
 	Stale bool
 }
 
+// stale returns the cached body (if any) tagged Stale — errors must not
+// discard data the caller could still display; the design promises "backing
+// off → stale body, exit 3; nothing cached → exit 1".
+func stale(name string) Result {
+	if body, err := os.ReadFile(cachePath(name)); err == nil {
+		return Result{Body: body, Stale: true}
+	}
+	return Result{}
+}
+
 func Fetch(url, name string, ttl, timeout time.Duration, ua string) (Result, error) {
 	if strings.ContainsAny(name, "/\\") || strings.Contains(name, "..") {
 		return Result{}, fmt.Errorf("invalid cache name %q", name)
@@ -66,13 +76,13 @@ func Fetch(url, name string, ttl, timeout time.Duration, ua string) (Result, err
 	resp, err := client.Do(req)
 	if err != nil {
 		fail(name, now, 10*time.Second)
-		return Result{}, err
+		return stale(name), err
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20))
 	if err != nil {
 		fail(name, now, 10*time.Second)
-		return Result{}, err
+		return stale(name), err
 	}
 	if resp.StatusCode == 429 {
 		wait := 30 * time.Second
@@ -83,11 +93,11 @@ func Fetch(url, name string, ttl, timeout time.Duration, ua string) (Result, err
 		}
 		wait = max(wait, 30*time.Second)
 		fail(name, now, wait)
-		return Result{}, fmt.Errorf("HTTP 429 — next try in %s", wait)
+		return stale(name), fmt.Errorf("HTTP 429 — next try in %s", wait)
 	}
 	if resp.StatusCode >= 400 {
 		fail(name, now, 10*time.Second)
-		return Result{}, fmt.Errorf("HTTP %d", resp.StatusCode)
+		return stale(name), fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
 	os.WriteFile(cachePath(name), body, 0o644)
 	os.Remove(statePath(name))

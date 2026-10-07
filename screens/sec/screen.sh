@@ -34,7 +34,7 @@ while :; do
     if [ "$fresh" -eq 1 ] && command -v jq >/dev/null 2>&1; then
         n=$(jq -r '[(.ips // [])[] | select((keys | length) > 0)] | length' "$UCACHE" 2>/dev/null)
         if [ "${n:-0}" -gt 0 ]; then
-            cat=$(jq -r '[(.ips // [])[] | select((keys | length) > 0)] | (.[0].catName // .[0].category // .[0].name // "?")' "$UCACHE" 2>/dev/null)
+            cat=$(jq -r '[(.ips // [])[] | select((keys | length) > 0)] | (.[0].catName // .[0].category // .[0].name // "?")' "$UCACHE" 2>/dev/null | tr -d '\000-\037\177')
             printf '  %b⚠ %s%b\n' "$R" "$n" "$OFF"
             printf '  %b%s%b\n' "$D" "$(printf "%.*s" $((W - 4)) "$cat")" "$OFF"
             "$EXE" chip sec orange 2 "⚠${n}threats" 2>/dev/null
@@ -106,7 +106,9 @@ while :; do
         printf '%s\n' "$rows" | while read -r disp name; do
             [ -z "$disp" ] && continue
             nl=$((nl + 1))
-            [ "$nl" -ge "$MAXPORTS" ] && break
+            [ "$nl" -gt "$MAXPORTS" ] && break
+            # process names from ss/lsof are untrusted: strip control bytes
+            name=$(printf '%s' "$name" | tr -d '\000-\037\177')
             printf '  %b%-9s%b %s\n' "$Y" "$disp" "$OFF" "$(printf "%.*s" $((W - 12)) "$name")"
         done
         [ "${lan:-0}" -gt 0 ] || printf '  %bnone%b\n' "$D" "$OFF"

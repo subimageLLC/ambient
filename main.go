@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -64,6 +65,11 @@ func main() {
 			if n, err := strconv.Atoi(os.Args[2]); err == nil {
 				secs = n
 			}
+		}
+		// a zero/negative interval would hot-loop Rotate; the config
+		// validator enforces >=5, the raw CLI path must too
+		if secs < 5 {
+			secs = 5
 		}
 		tick := func() error {
 			err := session.Rotate(false)
@@ -439,7 +445,14 @@ func cmdChart(args []string) {
 	width := fs.Int("width", 80, "columns")
 	ascii := fs.Bool("ascii", false, "plain # rendering")
 	js := fs.Bool("json", false, "emit metadata as json (line only)")
-	fs.Parse(args[1:])
+	fs.Parse(args)
+	// non-positive dimensions would panic in make; clamp instead
+	if *height < 1 {
+		*height = 1
+	}
+	if *width < 1 {
+		*width = 1
+	}
 
 	var vals []float64
 	sc := bufio.NewScanner(os.Stdin)
@@ -450,6 +463,9 @@ func cmdChart(args []string) {
 			continue
 		}
 		if v, err := strconv.ParseFloat(f[len(f)-1], 64); err == nil {
+			if math.IsNaN(v) || math.IsInf(v, 0) {
+				continue // a NaN token parses fine and renders garbage braille
+			}
 			vals = append(vals, v)
 		}
 	}
