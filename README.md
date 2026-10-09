@@ -135,7 +135,7 @@ happened, when, and whether it is still broken*:
     EVENTS   1 open · 1 fixed · 24h window
      16:04  ⚠ live   203.0.113.45 — ssh: 87 failed logins (1h)
      15:37  ✓ fix    backup-timer — failed (exec), recovered after 37m
-     hum    kernel:edt_ft5x06 ×6.4k · muted sources stay counted
+     hum    kernel:vc4 ×6.4k · muted sources stay counted
 
 Everything else collapses into the one-line hum footer, grouped by source.
 Acknowledged noise goes quiet via `~/.config/ambient/screens/events-mute`

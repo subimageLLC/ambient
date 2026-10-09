@@ -13,7 +13,7 @@ Incumbents (MagicMirror², Homepage, Glance, e-ink projects) are all
 browser/graphical. Terminal-native is the open niche: tmux + TUI screens means
 the same code runs over ssh, on a Pi kiosk, or in a corner terminal.
 
-~80% of this design is proven in production on a hand-built kiosk ("the kiosk"):
+~80% of this design is proven in production on a hand-built kiosk:
 the tmux session builder, rotation timer, pause flag, per-screen caching with
 rate-limit backoff, and ANSI theme passthrough all run there daily.
 

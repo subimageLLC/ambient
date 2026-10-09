@@ -16,7 +16,7 @@
 - [x] pane splits per screen (`[[panes]]` in manifest) — the kiosk's layouts port
 - [x] status chips (`ambient chip`/`status`, ticker render, stale dim, dead drop)
 - [x] the kiosk parity screens: docker (read-only), events (replaced logs), sec, net tailnet pane
-- [x] the kiosk cutover: Go binary at /usr/local/bin/ambient, private screens (lan, sec+unifi) in ~<service-user>/.config/ambient/screens/, shim with old builder kept at ~/bin/ambient.bash.bak, runbook at the kiosk:the cutover runbook
+- [x] the kiosk cutover: Go binary at /usr/local/bin/ambient, private screens (lan, sec+unifi) in ~<service-user>/.config/ambient/screens/, shim with old builder kept at ~/bin/ambient.bash.bak, runbook on the kiosk
 - [x] clock → now rename (now.conf with clock.conf fallback)
 - [x] doctor: distro detection (suse + red hat families, correct apk/zypper verbs), journal-readability probe, non-zero exit when enabled screens' needs are missing
 - [x] CI: `make check` = vet + gofmt + shellcheck + script syntax + go tests + headless smoke against the real screens, on ubuntu and macOS
