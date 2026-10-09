@@ -8,10 +8,6 @@ glyphs   = "plain"
 reads    = ["~/.config/ambient/screens/net.conf"]
 contacts = []
 keys     = ["no in-screen keys — press C-b * to change the wan target"]
-
-# faithful port of the kiosk's net window: gping gateway + wan on top,
-# tailnet peer dots on the bottom 40%
-[[panes]]
-entry   = "tailnet.sh"
-split   = "v"
-percent = 40
+# faithful port of the kiosk's net window: gping gateway + wan, full height.
+# The tailnet peer dots moved to their own screen (and, on the kiosk, into the
+# private lan screen's bottom pane).

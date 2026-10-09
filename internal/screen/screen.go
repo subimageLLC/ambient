@@ -166,7 +166,7 @@ func SyncEmbedded(embedded embed.FS, dest string) error {
 // screens list): the glance screen leads, interactive data screens follow,
 // infrastructure trails. Anything not listed (private screens) appends
 // alphabetically.
-var DefaultOrder = []string{"now", "net", "sys", "coins", "docker", "events", "sec"}
+var DefaultOrder = []string{"now", "net", "tailnet", "sys", "coins", "docker", "events", "sec"}
 
 func Discover(configDir, dataDir string, enabled []string) ([]Screen, error) {
 	byName := map[string]Screen{}

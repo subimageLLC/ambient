@@ -29,7 +29,7 @@ mkdir -p "$AMBIENT_CONFIG_DIR"
 # graceful-availability states. coins included on purpose: a python
 # startup crash (e.g. a NameError from a "cleanup") kills its window
 # before remain-on-exit lands — that class belongs in CI, not on a kiosk
-printf 'screens = ["now", "net", "coins", "docker", "events", "sec"]\nrotation_secs = 5\n' \
+printf 'screens = ["now", "net", "tailnet", "coins", "docker", "events", "sec"]\nrotation_secs = 5\n' \
     > "$AMBIENT_CONFIG_DIR/ambient.toml"
 
 note "env: $AMBIENT_CONFIG_DIR"
@@ -39,7 +39,7 @@ note "env: $AMBIENT_CONFIG_DIR"
 sleep 8   # let every screen run at least one frame
 
 windows=$(tmux list-windows -t "$AMBIENT_SESSION" -F '#W' 2>/dev/null | tr '\n' ' ')
-[ "$windows" = "now net coins docker events sec " ] && ok "windows: $windows" || bad "windows: got [$windows]"
+[ "$windows" = "now net tailnet coins docker events sec " ] && ok "windows: $windows" || bad "windows: got [$windows]"
 
 # ---- per-pane assertions ------------------------------------------------
 capture() { tmux capture-pane -p -t "$AMBIENT_SESSION:$1" 2>/dev/null; }
@@ -69,10 +69,11 @@ pane_ok sec    "sec"
 want   sec "SEC"     "sec header"
 want   sec "exposed" "sec ports section"
 
-# ---- panes feature: net is split (gping + tailnet) ----------------------
-n=$(tmux list-panes -t "$AMBIENT_SESSION:net" -F x 2>/dev/null | wc -l | tr -d ' ')
-[ "$n" = "2" ] && ok "net has 2 panes" || bad "net pane count: got $n, want 2"
-want net.1 "tailscale not installed|tailnet" "tailnet pane (or its missing-binary state)"
+# ---- net (gping only) + tailnet (own screen since the lan split) ---------
+pane_ok net    "net"
+want   net "avg|net:" "net pane (gping stats or its missing-binary state)"
+pane_ok tailnet "tailnet"
+want   tailnet "tailscale not installed|tailnet" "tailnet screen (or its missing-binary state)"
 
 # ---- chips end-to-end: write, render, land in the bar -------------------
 "$BIN" chip smoke red 1 "SMOKE-CHIP"

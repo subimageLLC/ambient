@@ -1,0 +1,11 @@
+# tailnet — self + peer dots, online first. Own screen so every host gets
+# overlay-peer status; the kiosk additionally embeds this same script as a pane
+# inside its private lan screen (net used to carry it — see net/manifest).
+name     = "tailnet"
+mode     = "interactive"
+entry    = "screen.sh"
+needs    = ["tailscale"]
+glyphs   = "plain"
+reads    = []
+contacts = []
+keys     = ["no in-screen keys"]
