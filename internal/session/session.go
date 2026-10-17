@@ -251,7 +251,14 @@ func Build(o Options) error {
 // what ambient wants.
 func (o Options) bindKeys() error {
 	gate := "#{==:#{session_name}," + Name() + "}"
-	pauseCmd := "run-shell " + q(q(o.Exe)+" pause")
+	// run-shell keeps the toggle exactly-once — #() format substitution is
+	// asynchronous and cached, so it may not re-run and would misreport
+	// toggles. The script consumes all stdout (nothing lands in copy mode
+	// over the paused screen) and echoes the state to the attached client.
+	pauseCmd := "run-shell " + q(
+		"m=$(" + q(o.Exe) + " pause); " +
+			"c=$(tmux list-clients -t " + Name() + " -F '#{client_name}' 2>/dev/null | head -1); " +
+			"[ -n \"$c\" ] && tmux display-message -c \"$c\" \"ambient: $m\"")
 	helpCmd := "display-popup -w 64 -h 20 -E " + q(q(o.Exe)+" help --esc")
 	setupCmd := "display-popup -w 80 -h 16 -E AMBIENT_POPUP=1 " + q(q(o.Exe)+" setup-here")
 	binds := [][]string{
