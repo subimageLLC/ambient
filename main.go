@@ -445,7 +445,7 @@ func cmdChart(args []string) {
 	width := fs.Int("width", 80, "columns")
 	ascii := fs.Bool("ascii", false, "plain # rendering")
 	js := fs.Bool("json", false, "emit metadata as json (line only)")
-	fs.Parse(args)
+	fs.Parse(args[1:]) // args[0] is the line|volume subcommand; parsing it stops flag handling
 	// non-positive dimensions would panic in make; clamp instead
 	if *height < 1 {
 		*height = 1
