@@ -13,12 +13,14 @@ over ssh, in a corner terminal, or fullscreen on a kiosk.
 
 ## Screens
 
-Real sessions, real data (rendered from live captures — solarized dark, tmux status bar
-with the chip convention and per-screen keys):
+Live pane captures with real data (solarized dark); the status bar is
+reconstructed from the session's own format strings — chips, window tabs,
+and the ambient badge as tmux renders them:
 
-The rotation, as it happens (one pass, then it loops):
+All eight screens in one pass (slideshow at ~1.4s each — the real rotation
+is 60s by default):
 
-![ambient rotating through its screens](assets/demo.gif)
+![ambient's screens, one after another](assets/demo.gif)
 
 | | |
 |---|---|
