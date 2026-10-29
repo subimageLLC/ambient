@@ -10,6 +10,23 @@ over ssh, in a corner terminal, or fullscreen on a kiosk.
 - **PII-free core** — nothing phones home with identifying data; add your own
   private screens in `~/.config/ambient/screens/` and they never leave your machine
 
+
+## Screens
+
+Real sessions, real data (rendered from live captures — solarized dark, tmux status bar
+with the chip convention and per-screen keys):
+
+The rotation, as it happens (one pass, then it loops):
+
+![ambient rotating through its screens](assets/demo.gif)
+
+| | |
+|---|---|
+| ![now — time & weather](assets/screens/now.png) | ![coins — crypto charts](assets/screens/coins.png) |
+| ![sys — system stats](assets/screens/sys.png) | ![net — latency](assets/screens/net.png) |
+| ![docker — containers](assets/screens/docker.png) | ![sec — security](assets/screens/sec.png) |
+| ![events — journal as plain events](assets/screens/events.png) | ![tailnet — peers](assets/screens/tailnet.png) |
+
 ## Install
 
     go install ./...          # from a checkout
