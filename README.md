@@ -13,21 +13,42 @@ over ssh, in a corner terminal, or fullscreen on a kiosk.
 
 ## Screens
 
-Live pane captures with real data (solarized dark); the status bar is
-reconstructed from the session's own format strings — chips, window tabs,
-and the ambient badge as tmux renders them:
+Pane captures from live sessions, real data, one monospace grid — dark and
+light. Light mode is the same ANSI bytes through a Solarized Light palette
+(what a light terminal profile does); `sys` follows the desktop appearance
+via btop's own theme. The status bar (badge, window tabs, chips) is
+reconstructed from the session's format strings.
 
-All eight screens in one pass (slideshow at ~1.4s each — the real rotation
+All eight screens in one pass — slideshow at ~1.4s each (the real rotation
 is 60s by default):
 
-![ambient's screens, one after another](assets/demo.gif)
+![ambient's screens rotating](assets/demo.gif)
 
-| | |
-|---|---|
-| ![now — time & weather](assets/screens/now.png) | ![coins — crypto charts](assets/screens/coins.png) |
-| ![sys — system stats](assets/screens/sys.png) | ![net — latency](assets/screens/net.png) |
-| ![docker — containers](assets/screens/docker.png) | ![sec — security](assets/screens/sec.png) |
-| ![events — journal as plain events](assets/screens/events.png) | ![tailnet — peers](assets/screens/tailnet.png) |
+Dark:
+
+<p>
+  <img src="assets/screens/now.png" alt="now — time and weather" width="49.5%">
+  <img src="assets/screens/coins.png" alt="coins — crypto charts" width="49.5%">
+  <img src="assets/screens/sys.png" alt="sys — system stats" width="49.5%">
+  <img src="assets/screens/net.png" alt="net — latency graph" width="49.5%">
+  <img src="assets/screens/docker.png" alt="docker — containers" width="49.5%">
+  <img src="assets/screens/sec.png" alt="sec — security posture" width="49.5%">
+  <img src="assets/screens/events.png" alt="events — journal as events" width="49.5%">
+  <img src="assets/screens/tailnet.png" alt="tailnet — tailnet peers" width="49.5%">
+</p>
+
+Light:
+
+<p>
+  <img src="assets/screens/light/now.png" alt="now — light" width="49.5%">
+  <img src="assets/screens/light/coins.png" alt="coins — light" width="49.5%">
+  <img src="assets/screens/light/sys.png" alt="sys — light" width="49.5%">
+  <img src="assets/screens/light/net.png" alt="net — light" width="49.5%">
+  <img src="assets/screens/light/docker.png" alt="docker — light" width="49.5%">
+  <img src="assets/screens/light/sec.png" alt="sec — light" width="49.5%">
+  <img src="assets/screens/light/events.png" alt="events — light" width="49.5%">
+  <img src="assets/screens/light/tailnet.png" alt="tailnet — light" width="49.5%">
+</p>
 
 ## Install
 
