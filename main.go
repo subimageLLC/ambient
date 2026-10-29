@@ -345,7 +345,18 @@ func unconfigured(screens []screen.Screen) []string {
 		if s.Setup == "" || s.SetupOptional || len(s.Reads) == 0 {
 			continue
 		}
-		p := filepath.Join(os.Getenv("HOME"), strings.TrimPrefix(s.Reads[0], "~"))
+		// reads are recorded against the default config dir; honor an
+		// AMBIENT_CONFIG_DIR override so redirected configs don't warn
+		read := s.Reads[0]
+		if strings.HasPrefix(read, "~/.config/ambient") {
+			read = filepath.Join(cfg.Dir(), strings.TrimPrefix(read, "~/.config/ambient"))
+		}
+		var p string
+		if filepath.IsAbs(read) {
+			p = read
+		} else {
+			p = filepath.Join(os.Getenv("HOME"), strings.TrimPrefix(read, "~"))
+		}
 		if strings.Contains(p, "*") {
 			continue
 		}

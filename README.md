@@ -13,14 +13,15 @@ over ssh, in a corner terminal, or fullscreen on a kiosk.
 
 ## Screens
 
-Pane captures from live sessions, real data, one monospace grid — dark and
-light. Light mode is the same ANSI bytes through a Solarized Light palette
-(what a light terminal profile does); `sys` follows the desktop appearance
-via btop's own theme. The status bar (badge, window tabs, chips) is
-reconstructed from the session's format strings.
+Real screenshots: ambient running under its kiosk terminal (kitty at product
+defaults — DejaVu Sans Mono) on the kiosk host. The light set is the same
+session through a Solarized Light terminal palette, with `sys` following the
+desktop's light setting via btop's own theme. (`docker` and `tailnet` are
+real screens too — not shown because this host's container and peer names
+aren't ours to publish.)
 
-All eight screens in one pass — slideshow at ~1.4s each (the real rotation
-is 60s by default):
+The rotation (slideshow at ~1.4s per screen; the real rotation is 60s by
+default):
 
 ![ambient's screens rotating](assets/demo.gif)
 
@@ -31,10 +32,8 @@ Dark:
   <img src="assets/screens/coins.png" alt="coins — crypto charts" width="49.5%">
   <img src="assets/screens/sys.png" alt="sys — system stats" width="49.5%">
   <img src="assets/screens/net.png" alt="net — latency graph" width="49.5%">
-  <img src="assets/screens/docker.png" alt="docker — containers" width="49.5%">
   <img src="assets/screens/sec.png" alt="sec — security posture" width="49.5%">
   <img src="assets/screens/events.png" alt="events — journal as events" width="49.5%">
-  <img src="assets/screens/tailnet.png" alt="tailnet — tailnet peers" width="49.5%">
 </p>
 
 Light:
@@ -44,10 +43,8 @@ Light:
   <img src="assets/screens/light/coins.png" alt="coins — light" width="49.5%">
   <img src="assets/screens/light/sys.png" alt="sys — light" width="49.5%">
   <img src="assets/screens/light/net.png" alt="net — light" width="49.5%">
-  <img src="assets/screens/light/docker.png" alt="docker — light" width="49.5%">
   <img src="assets/screens/light/sec.png" alt="sec — light" width="49.5%">
   <img src="assets/screens/light/events.png" alt="events — light" width="49.5%">
-  <img src="assets/screens/light/tailnet.png" alt="tailnet — light" width="49.5%">
 </p>
 
 ## Install
