@@ -31,13 +31,16 @@ fi
 
 mkdir -p "$CACHE"
 T=$(theme_now)
-# flip only the theme — btop saves the user's box/layout tweaks back into
-# this conf, and a blind rewrite would reset them on every appearance change
-if [ -s "$CACHE/btop.conf" ] && grep -q '^color_theme = ' "$CACHE/btop.conf"; then
-    sed -i "s/^color_theme = .*/color_theme = \"$T\"/" "$CACHE/btop.conf"
-else
-    printf 'color_theme = "%s"\n' "$T" >"$CACHE/btop.conf"
-fi
+# flip only the theme — btop writes box/layout tweaks back into this conf,
+# and a blind rewrite would reset them on every appearance change. POSIX
+# only: no sed -i (BSD sed wants a backup suffix); a missing theme line is
+# appended; every other line survives verbatim.
+[ -f "$CACHE/btop.conf" ] || : >"$CACHE/btop.conf"
+awk -v t="$T" '
+    /^color_theme[[:space:]]*=/ { printf "color_theme = \"%s\"\n", t; found = 1; next }
+    { print }
+    END { if (!found) printf "color_theme = \"%s\"\n", t }
+' "$CACHE/btop.conf" >"$CACHE/btop.conf.tmp" && mv "$CACHE/btop.conf.tmp" "$CACHE/btop.conf"
 
 sq() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
 RESTART="AMBIENT_CONFIG_DIR=$(sq "${AMBIENT_CONFIG_DIR:-}")"
