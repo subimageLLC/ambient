@@ -31,7 +31,13 @@ fi
 
 mkdir -p "$CACHE"
 T=$(theme_now)
-printf 'color_theme = "%s"\n' "$T" >"$CACHE/btop.conf"
+# flip only the theme — btop saves the user's box/layout tweaks back into
+# this conf, and a blind rewrite would reset them on every appearance change
+if [ -s "$CACHE/btop.conf" ] && grep -q '^color_theme = ' "$CACHE/btop.conf"; then
+    sed -i "s/^color_theme = .*/color_theme = \"$T\"/" "$CACHE/btop.conf"
+else
+    printf 'color_theme = "%s"\n' "$T" >"$CACHE/btop.conf"
+fi
 
 sq() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
 RESTART="AMBIENT_CONFIG_DIR=$(sq "${AMBIENT_CONFIG_DIR:-}")"
