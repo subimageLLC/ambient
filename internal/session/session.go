@@ -256,8 +256,8 @@ func (o Options) bindKeys() error {
 	// toggles. The script consumes all stdout (nothing lands in copy mode
 	// over the paused screen) and echoes the state to the attached client.
 	pauseCmd := "run-shell " + q(
-		"m=$(" + q(o.Exe) + " pause); " +
-			"c=$(tmux list-clients -t " + Name() + " -F '#{client_name}' 2>/dev/null | head -1); " +
+		"m=$("+q(o.Exe)+" pause); "+
+			"c=$(tmux list-clients -t "+Name()+" -F '#{client_name}' 2>/dev/null | head -1); "+
 			"[ -n \"$c\" ] && tmux display-message -c \"$c\" \"ambient: $m\"")
 	helpCmd := "display-popup -w 64 -h 20 -E " + q(q(o.Exe)+" help --esc")
 	setupCmd := "display-popup -w 80 -h 16 -E AMBIENT_POPUP=1 " + q(q(o.Exe)+" setup-here")
@@ -265,6 +265,9 @@ func (o Options) bindKeys() error {
 		{"bind-key", "-T", "prefix", "N", "if-shell", "-F", gate, "previous-window", ""},
 		{"bind-key", "-T", "prefix", "C-N", "if-shell", "-F", gate, "previous-window", ""},
 		{"bind-key", "-T", "prefix", "p", "if-shell", "-F", gate, pauseCmd, "previous-window"},
+		// tap/click the ambient badge to toggle pause — the kiosk has no
+		// keyboard, so the status bar must carry its own affordance
+		{"bind-key", "-n", "MouseDown1StatusLeft", "if-shell", "-F", gate, pauseCmd, ""},
 		{"bind-key", "-T", "prefix", "?", "if-shell", "-F", gate, helpCmd, "list-keys -N"},
 		{"bind-key", "-T", "prefix", "*", "if-shell", "-F", gate, setupCmd, ""},
 		{"bind-key", "-n", "MouseDown1StatusRight", "if-shell", "-F", gate, helpCmd, ""},
@@ -281,7 +284,7 @@ func (o Options) bindKeys() error {
 // RenderStatus applies the status-bar chips (state files under
 // ~/.cache/ambient/status/) to this session's status-right.
 func RenderStatus() error {
-	rendered := status.Render(status.Read(), time.Now())
+	rendered := status.Render(status.Read(), time.Now(), Paused())
 	return run([]string{"set-option", "-t", Name(), "status-right", rendered}, false)
 }
 

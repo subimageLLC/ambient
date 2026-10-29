@@ -33,7 +33,7 @@ func TestRenderOrdersAndColors(t *testing.T) {
 			{Text: "3threats", Color: "orange", Prio: 2},
 		}}},
 	}
-	got := Render(entries, now)
+	got := Render(entries, now, false)
 	// WAN (prio 1) first, then the two prio-2 chips (logs before sec), then hints
 	ai := indexOf(got, "⚠WAN")
 	oi := indexOf(got, "3threats")
@@ -58,7 +58,7 @@ func TestRenderStaleCollapsesToDim(t *testing.T) {
 	entries := []Entry{
 		{Name: "unifi", State: State{TS: old.Unix(), Chips: []Chip{{Text: "⚠WAN", Color: "red", Prio: 1}}}},
 	}
-	got := Render(entries, now)
+	got := Render(entries, now, false)
 	if !contains(got, "#[fg=#586e75] unifi?") {
 		t.Fatalf("stale writer not dimmed: %q", got)
 	}
@@ -73,16 +73,34 @@ func TestRenderDeadWriterDropped(t *testing.T) {
 	entries := []Entry{
 		{Name: "logs", State: State{TS: dead.Unix(), Chips: []Chip{{Text: "⚠9err", Color: "red", Prio: 2}}}},
 	}
-	got := Render(entries, now)
+	got := Render(entries, now, false)
 	if contains(got, "logs") || contains(got, "⚠9err") {
 		t.Fatalf("dead writer still rendered: %q", got)
 	}
 }
 
 func TestRenderEmpty(t *testing.T) {
-	got := Render(nil, time.Now())
+	got := Render(nil, time.Now(), false)
 	if !contains(got, "? keys") || !contains(got, "%H:%M") {
 		t.Fatalf("hints/clock missing: %q", got)
+	}
+}
+
+func TestRenderPausedChip(t *testing.T) {
+	entries := []Entry{
+		{Name: "sec", State: State{TS: time.Now().Unix(), Chips: []Chip{{Text: "⚠WAN", Color: "red", Prio: 1}}}},
+	}
+	paused := Render(entries, time.Now(), true)
+	resumed := Render(entries, time.Now(), false)
+	pi, wi := indexOf(paused, "⏸ paused"), indexOf(paused, "⚠WAN")
+	if pi == -1 {
+		t.Fatalf("paused chip missing: %q", paused)
+	}
+	if wi != -1 && pi > wi {
+		t.Fatalf("paused chip not leading: %q", paused)
+	}
+	if contains(resumed, "⏸") {
+		t.Fatalf("paused chip rendered while running: %q", resumed)
 	}
 }
 
@@ -112,7 +130,7 @@ func TestRenderEscapesTmuxFormat(t *testing.T) {
 		}}},
 		{Name: "bad\x07writer", State: State{TS: now.Unix(), Chips: []Chip{{Text: "x", Color: "red", Prio: 2}}}},
 	}
-	got := Render(entries, now)
+	got := Render(entries, now, false)
 	// every "#("/"#{" must be preceded by another "#" (i.e. escaped as
 	// "##("/"##{" — tmux renders those literally instead of executing)
 	for i := 0; i+2 < len(got); i++ {

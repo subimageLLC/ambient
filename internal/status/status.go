@@ -171,7 +171,9 @@ func Read() []Entry {
 // Render turns entries into a tmux status-right string: chips sorted by
 // priority (lower first, then writer name), stale writers collapse to a dim
 // "name?" chip, and the clock trails. Mirrors the solarized kiosk bar.
-func Render(entries []Entry, now time.Time) string {
+// When paused, a yellow "⏸ paused" chip leads — on a keyboardless kiosk the
+// bar is the only place the rotation state is visible.
+func Render(entries []Entry, now time.Time, paused bool) string {
 	type flat struct {
 		writer string
 		chip   Chip
@@ -201,6 +203,9 @@ func Render(entries []Entry, now time.Time) string {
 		return all[i].writer < all[j].writer
 	})
 	var b strings.Builder
+	if paused {
+		fmt.Fprintf(&b, "#[fg=%s,bold] ⏸ paused#[default]", colors["yellow"])
+	}
 	for _, f := range all {
 		if f.stale {
 			fmt.Fprintf(&b, "#[fg=%s] %s?#[default]", colors["dim"], tmuxEscape(f.writer))

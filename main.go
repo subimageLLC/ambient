@@ -59,6 +59,9 @@ func main() {
 			state = "paused"
 		}
 		fmt.Println("rotation:", state)
+		// refresh the bar so the paused chip appears (or clears) now, not on
+		// the next tick — best-effort: `ambient pause` may run sessionless
+		_ = session.RenderStatus()
 	case "ticker":
 		secs := 60
 		if len(os.Args) > 2 {
@@ -106,7 +109,7 @@ func main() {
 		if err := session.RenderStatus(); err != nil {
 			die(err)
 		}
-		fmt.Println(status.Render(status.Read(), time.Now()))
+		fmt.Println(status.Render(status.Read(), time.Now(), session.Paused()))
 	case "screens":
 		c, err := cfg.Load()
 		if err != nil {

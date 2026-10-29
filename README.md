@@ -54,9 +54,9 @@ Keys and clicks — the same on every screen, shown in the status bar:
 - `Ctrl-b ?` — key help for the current screen (per-screen keys come from its manifest)
 - `Ctrl-b *` — settings for the current screen (runs its setup in a popup; screens without one list their on-screen keys instead)
 - `Ctrl-b n` / `N` — next / previous screen
-- `Ctrl-b p` — pause/unpause rotation
+- `Ctrl-b p` — pause/unpause rotation (a yellow `⏸ paused` chip shows in the status bar while paused)
 - `Ctrl-b d` — detach
-- **Mouse**: click `⌨ ?` or `* setup` in the status bar for the same popups; click a window name to switch screens
+- **Mouse**: click `⌨ ?` or `* setup` in the status bar for the same popups; click the `ambient` badge to pause/unpause (works on a keyboardless kiosk); click a window name to switch screens
 
 ## Requirements
 
