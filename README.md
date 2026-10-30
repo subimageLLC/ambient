@@ -4,26 +4,18 @@ An ambient display for any unix: a rotating dashboard of terminal screens —
 time & weather, network, crypto, system, docker, events, security — that runs
 over ssh, in a corner terminal, or fullscreen on a kiosk.
 
+Start it on a server, attach from your laptop, walk away. It keeps running.
+
 - **No daemon** — a tmux session you can attach to from anywhere
 - **No browser, no cloud, no telemetry**
 - **Every screen is a plain script** you can read and edit
-- **PII-free core** — nothing phones home with identifying data; add your own
-  private screens in `~/.config/ambient/screens/` and they never leave your machine
-
+- **Nothing identifying leaves your machine** — the core talks to no one;
+  screens declare their own contacts, and screens you drop in
+  `~/.config/ambient/screens/` are yours alone
 
 ## Screens
 
-Real screenshots: ambient running under its kiosk terminal (kitty at product
-defaults — DejaVu Sans Mono) on the kiosk host. The light set is the same
-session through a Solarized Light terminal palette, with `sys` following the
-desktop's light setting via btop's own theme. (`docker` and `tailnet` are
-real screens too — not shown because this host's container and peer names
-aren't ours to publish.)
-
-The rotation (slideshow at ~1.4s per screen; the real rotation is 60s by
-default):
-
-![ambient's screens rotating](assets/demo.gif)
+![ambient rotating through its screens](assets/demo.gif)
 
 Dark:
 
@@ -34,9 +26,8 @@ Dark:
   <img src="assets/screens/net.png" alt="net — latency graph" width="49.5%">
   <img src="assets/screens/sec.png" alt="sec — security posture" width="49.5%">
   <img src="assets/screens/events.png" alt="events — journal as events" width="49.5%">
-</p>
 
-Light:
+</p>
 
 <p>
   <img src="assets/screens/light/now.png" alt="now — light" width="49.5%">
@@ -66,10 +57,10 @@ Screens rotate every 60s by default. Core options live in `~/.config/ambient/amb
 
 **Screens configure themselves — no config file editing required:**
 
-Blank-slate friendly: with no config at all, ambient rotates through every
-screen in a curated order (glance screen first) and tells you how to opt
-into the rest; every wait shows its state (fetching, rate-limited with a
-retry countdown, stale) — never a blank or frozen frame.
+With no config at all, ambient rotates through every screen in a curated order
+(glance screen first) and tells you how to opt into the rest; every wait shows
+its state (fetching, rate-limited with a retry countdown, stale) — never a
+blank or frozen frame.
 
 - `coins` — on first run, a picker opens right on the screen: browse popular
   coins grouped by network (majors, ethereum, base, solana, hyperliquid,
@@ -93,7 +84,7 @@ Keys and clicks — the same on every screen, shown in the status bar:
 - `Ctrl-b n` / `N` — next / previous screen
 - `Ctrl-b p` — pause/unpause rotation (a yellow `⏸ paused` chip shows in the status bar while paused)
 - `Ctrl-b d` — detach
-- **Mouse**: click `⌨ ?` or `* setup` in the status bar for the same popups; click the `ambient` badge to pause/unpause (works on a keyboardless kiosk); click a window name to switch screens
+- **Mouse**: click `⌨ ?` or `* setup` in the status bar for the same popups; click the `ambient` badge to pause/unpause; click a window name to switch screens
 
 ## Requirements
 
@@ -112,17 +103,16 @@ Same code everywhere; screens degrade per-host rather than failing:
 
 | tier | platforms | story |
 |---|---|---|
-| tested | macOS, Debian / Ubuntu / Raspberry Pi OS | the kiosk is a Pi; day-to-day dev on macOS |
+| tested | macOS, Debian / Ubuntu / Raspberry Pi OS | developed and daily-driven on both |
 | same family | Fedora, RHEL / CentOS / Rocky / Alma, Arch, openSUSE | systemd + GNU userland — everything should just work. On Arch (and stock RHEL), a default user cannot read the *system* journal; `ambient doctor` checks and tells you to add yourself to `systemd-journal`/`adm`, or the events screen shows nothing |
 | partial | non-systemd linux (Alpine, Void, Artix, Devuan, Gentoo/openrc) | core + now/net/sys/coins/docker/sec work; events needs a systemd journal and shows n/a — but it degrades in place |
 | untested | FreeBSD / OpenBSD / NetBSD | the Go binary and tmux exist everywhere and the scripts carry BSD fallbacks (`stat -f`, `route get`, `lsof`), but there are no release binaries yet — build from source and expect rough edges |
 
 ### Why toilet?
 
-The now screen's big digits come from `toilet -f mono12` — the same renderer the
-original kiosk uses, so the look is identical everywhere. toilet, jq, gping,
-and btop are packaged in Debian, Ubuntu, Fedora, Arch, openSUSE, the BSDs
-(ports), and Homebrew.
+The now screen's big digits come from `toilet -f mono12`, so the clock renders
+identically on every platform. toilet, jq, gping, and btop are packaged in
+Debian, Ubuntu, Fedora, Arch, openSUSE, the BSDs (ports), and Homebrew.
 
 ## Screen contract
 
@@ -138,7 +128,7 @@ A screen is a directory with a `manifest.toml` and an entrypoint:
     reads    = ["~/.config/ambient/screens/coins.conf"]
     contacts = ["api.coingecko.com"]
 
-    [[panes]]                    # optional extra panes; the kiosk's layout ported
+    [[panes]]                    # optional extra panes
     entry   = "tailnet.sh"       # each pane owns its own loop
     split   = "v"                # "v" stacked below, "h" side by side
     percent = 40                 # this pane's share, 5-90
@@ -157,17 +147,17 @@ renders them into the bar (sorted by prio, stale writers collapse to a dim
 
 ## Screen selection
 
-Core screens: `now` `net` `coins` `sys` `docker` `events` `sec`. The first
-four work out of the box; `events` needs a systemd journal host (macOS
-degrades to error-hum only), `sec` degrades to "not configured" without a
-private threat feed, `docker` needs docker CLI access (read-only by default —
-scoped sudoers or the docker group; running lazydocker with stop/restart
-powers is an opt-in you wire up yourself).
+Core screens: `now` `net` `coins` `sys` `docker` `events` `sec` (plus
+`tailnet` when tailscale is present). The first four work out of the box;
+`events` needs a systemd journal host (macOS degrades to error-hum only),
+`sec` degrades to "not configured" without a threat feed, `docker` needs
+docker CLI access (read-only by default — scoped sudoers or the docker group;
+running lazydocker with stop/restart powers is an opt-in you wire up
+yourself).
 
-`events` is what the old `logs` screen became: a raw log stream on an
-ambient display was noise theater, so the screen mines the journal with
-small local rules (no agent, no cloud) into plain-language events — *what
-happened, when, and whether it is still broken*:
+`events` mines the local journal with small built-in rules (no agent, no
+cloud) and surfaces plain-language events — *what happened, when, and whether
+it is still broken*:
 
     EVENTS   1 open · 1 fixed · 24h window
      16:04  ⚠ live   203.0.113.45 — ssh: 87 failed logins (1h)
@@ -182,11 +172,11 @@ paging the status bar — and the chip names the worst *unresolved* event
 
 Every screen is pane-size aware: narrow panes drop columns, short panes
 drop low-priority sections, and lines are cut to width rather than wrapped
-— the same screen works fullscreen on a kiosk and in a corner split.
+— the same screen works fullscreen and in a corner split.
 
-Drop one in `~/.config/ambient/screens/<name>/` to add or override — private
+Drop one in `~/.config/ambient/screens/<name>/` to add or override — your
 screens are never part of the published repo.
 
 ## Status
 
-Pre-alpha. Dogfooding on a live kiosk. See DESIGN.md.
+Pre-alpha; in daily use on real machines. See DESIGN.md for the architecture.
