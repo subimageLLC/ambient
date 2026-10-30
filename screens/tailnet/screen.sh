@@ -12,7 +12,13 @@ while :; do
         lastW=$W; lastL=$L
     fi
 
-    if ! command -v tailscale >/dev/null 2>&1; then
+    # the Mac App Store build ships its CLI inside the app bundle, not on
+    # PATH — probe it so MAS users don't see "not installed"
+    TS=tailscale
+    if ! command -v tailscale >/dev/null 2>&1 && [ -x "/Applications/Tailscale.app/Contents/MacOS/Tailscale" ]; then
+        TS="/Applications/Tailscale.app/Contents/MacOS/Tailscale"
+    fi
+    if ! command -v "$TS" >/dev/null 2>&1; then
         printf '\033[2J'
         printf ' tailnet\n\n'
         printf '\033[2m  tailscale not installed — this screen recovers once it is\033[0m\n'
@@ -22,7 +28,7 @@ while :; do
 
     printf ' \033[1;36mtailnet\033[0m  %s\n\n' "$(date '+%H:%M')"
 
-    total=$(tailscale status --json 2>/dev/null | jq -r '(.Peer // {}) | length' 2>/dev/null)
+    total=$("$TS" status --json 2>/dev/null | jq -r '(.Peer // {}) | length' 2>/dev/null)
     total=${total:-0}
     # self + peers = total+1 lines available in the list; header eats 2
     list=$((L - 2))
@@ -34,7 +40,7 @@ while :; do
     # awk strips control chars from those untrusted fields BEFORE adding ANSI.
     # Stripping after the fact (the old net/tailnet.sh bug) eats the ESC bytes
     # and prints literal "[1;32m●[0m" garbage.
-    tailscale status --json | jq -r '
+    "$TS" status --json | jq -r '
         (.Self | "S\u001f" + (.HostName // "?")),
         ((.Peer // {}) | to_entries | map(.value) | sort_by(.Online | not) | .[] |
             (if .Online then "O" else "F" end) + "\u001f" + (.HostName // "?") + "\u001f" + (.OS // ""))' 2>/dev/null \

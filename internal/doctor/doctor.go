@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"time"
 
@@ -16,6 +17,15 @@ import (
 func check(exe string) string {
 	if _, err := exec.LookPath(exe); err == nil {
 		return "ok"
+	}
+	// the Mac App Store Tailscale ships its CLI in the app bundle, not on
+	// PATH — honor it so MAS installs don't report "missing"
+	if exe == "tailscale" {
+		if runtime.GOOS == "darwin" {
+			if _, err := os.Stat("/Applications/Tailscale.app/Contents/MacOS/Tailscale"); err == nil {
+				return "ok"
+			}
+		}
 	}
 	return "missing"
 }
