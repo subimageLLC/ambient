@@ -1,6 +1,11 @@
 # TODO
 
 ## packaging (next milestone: v0.2.0)
+## done (2026-10-29, v0.2.0)
+- [x] goreleaser release pipeline (darwin+linux, amd64+arm64, checksums)
+- [x] homebrew tap: subimageLLC/homebrew-tap (`brew tap subimageLLC/tap && brew install ambient`)
+- [x] tag v0.2.0, first release with binaries
+- [x] repo public
 - [ ] goreleaser nfpm: `.deb` with `Depends: tmux, toilet, jq, gping` and `.rpm` with `Requires` — so a dpkg/dnf install pulls screen deps
 - [ ] homebrew tap (goreleaser generates the formula; brew pulls toilet/jq/gping/btop automatically)
 - [ ] AUR package
