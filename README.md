@@ -13,6 +13,22 @@ Start it on a server, attach from your laptop, walk away. It keeps running.
   screens declare their own contacts, and screens you drop in
   `~/.config/ambient/screens/` are yours alone
 
+## TL;DR
+
+    brew install subimageLLC/tap/ambient   # macOS or Linuxbrew
+    ambient start                          # that's it — Ctrl-b d to detach
+
+    # or from a checkout:
+    go install ./...
+
+Built on the boring unix tools you already have: the whole display **is a
+tmux session** — rotation is tmux windows, attach/detach is `tmux attach`,
+and every screen is a plain `/bin/sh` or python3 script drawing text.
+System stats come from **btop**, latency from **gping**, the clock digits
+from **toilet**, screen data shaping from **jq** — all standard packages,
+pulled in by the formula, checked by `ambient doctor`. No daemon, no
+browser, no database, no node_modules.
+
 ## Screens
 
 ![ambient rotating through its screens](assets/demo.gif)
@@ -37,11 +53,6 @@ Dark:
   <img src="assets/screens/light/sec.png" alt="sec — light" width="49.5%">
   <img src="assets/screens/light/events.png" alt="events — light" width="49.5%">
 </p>
-
-## Install
-
-    go install ./...          # from a checkout
-    # or: brew install ambient (tap coming)
 
 ## Quick start
 
